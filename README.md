@@ -6,7 +6,7 @@ A collaborative storyboarding platform that allows multiple users to plan, visua
 
 ## Project Status
 
-This project is currently in progress. Core features for creating storyboards and uploading images are functional. The PostgreSQL database schema and Supabase connection are already completed, but the database itself is not included in this repository.
+This project is currently in progress. Core features for creating storyboards and uploading images are functional. The PostgreSQL database schema and Supabase connection are mostly completed (everything except for the User table), but the database itself is not included in this repository.
 
 ---
 
@@ -28,7 +28,7 @@ This project is currently in progress. Core features for creating storyboards an
 
 ---
 
-## Database Schema Overview
+## Database Schema Overview (current)
 
 Below is the current PostgreSQL schema implemented in Supabase.
 
@@ -77,4 +77,6 @@ Below is the current PostgreSQL schema implemented in Supabase.
 
 - Real-time collaboration features  
 - Commenting system  
-- Project sharing and export options  
+- Project sharing and export options
+- Improved stylization
+- Animatic Functionality
