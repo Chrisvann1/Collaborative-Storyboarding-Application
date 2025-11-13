@@ -15,31 +15,37 @@ export default function Modal({ message, open, onClose, newBoard, setNewBoard, o
   if (!open) return null;
 
   //Image upload handle function 
-  async function handleImageUpload(e) {
-    const file = e.target.files[0]; 
-    if (!file) return; 
+async function handleImageUpload(e) {
+  const file = e.target.files[0]; 
+  if (!file) return; 
 
-    //Unique name for the image
-    const fileName = `${Date.now()}-${file.name}`;
+  const safeName = file.name
+    //Replace spaces with
+    .replace(/\s+/g, "_") 
+    //Removes other invalid characters
+    .replace(/[^a-zA-Z0-9._-]/g, ""); 
 
-    const { data, error } = await supabase.storage
-      .from("images")
-      .upload(fileName, file);
+  // Unique name for the image
+  const fileName = `${Date.now()}-${safeName}`;
 
-    if (error) {
-      console.error("Image upload failed:", error);
-      alert("Upload failed");
-      return;
-    }
+  const { data, error } = await supabase.storage
+    .from("images")
+    .upload(fileName, file);
 
-    //Get the data in order to pass it into the new board
-    const { data: urlData } = supabase.storage
-      .from("images")
-      .getPublicUrl(fileName);
-
-  //This gets all elements that are in the new board object, and then adds the image_url compenent
-  setNewBoard({ ...newBoard, image_url: urlData.publicUrl });
+  if (error) {
+    console.error("Image upload failed:", error);
+    alert("Upload failed");
+    return;
   }
+
+  // Get public URL
+  const { data: urlData } = supabase.storage
+    .from("images")
+    .getPublicUrl(fileName);
+
+  // Add image_url to the new board
+  setNewBoard({ ...newBoard, image_url: urlData.publicUrl });
+}
 
   return (
     <div className={styles.modal}>

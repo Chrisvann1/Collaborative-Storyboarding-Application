@@ -1,4 +1,5 @@
 import styles from "./EditModal.module.css"
+import { supabase } from "../supabase-client.js";
 
 export default function Modal({ message, open, onClose, selectedBoard, setSelectedBoard, onSubmit }) {
   if (!open || !selectedBoard) return null;
@@ -21,11 +22,53 @@ export default function Modal({ message, open, onClose, selectedBoard, setSelect
     onClose();
   };
 
+  // Handle image upload
+async function handleImageUpload(e) {
+  const file = e.target.files[0];
+  if (!file) return;
+
+  // Sanitize file name
+  const safeName = file.name
+    .replace(/\s+/g, "_")          // replace spaces with _
+    .replace(/[^a-zA-Z0-9._-]/g, ""); // remove any other invalid chars
+
+  const fileName = `${Date.now()}-${safeName}`;
+
+  const { data, error } = await supabase.storage
+    .from("images")
+    .upload(fileName, file);
+
+  if (error) {
+    console.error("Image upload failed:", error);
+    alert("Upload failed");
+    return;
+  }
+
+  const { data: urlData } = supabase.storage
+    .from("images")
+    .getPublicUrl(fileName);
+
+  setSelectedBoard({ ...selectedBoard, image_url: urlData.publicUrl });
+}
+
   return (
     <div className={styles.modal}>
       <div className={styles.overlay} onClick={onClose}></div>
       <div className={styles.modal_content}>
         <h2>{message}</h2>
+
+      {/* Image Upload */}
+      <label>Add Image</label>
+      <input type="file" accept="image/*" onChange={handleImageUpload} />
+
+      {/* Image Preview */}
+      {selectedBoard.image_url && (
+        <img
+          src={selectedBoard.image_url}
+          alt="Preview"
+          style={{ marginTop: "10px", maxWidth: "10%", height: "auto", maxHeight: "10%", borderRadius: "5px" }}
+        />
+      )}
 
         {/* Title */}
         <input

@@ -1,7 +1,7 @@
 import styles from "./UpdateProjectModal.module.css";
 
 export default function UpdateProjectModal({ message, open, onClose, updateProject, setUpdatedProject, onSubmit}) {
-  if (!open) return null;
+  if (!open || !updateProject) return null;
 
   return (
     <div className={styles.modal}>

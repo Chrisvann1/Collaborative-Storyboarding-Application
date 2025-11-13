@@ -1,4 +1,25 @@
+// DEV NOTES TO INCLUDE IN REPORT 
+// -------------------------------
+// 
+// In some places I have called the fetchBoards and fetchInfo both locally 
+// and across all clients - this is because the local updates were noticably faster 
+// due to noticable latency when updating using a Realtime Channel
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//
+
+
+
 import { useState } from "react";
+//Everytime something happens -> Do whatever 
 import { useEffect } from 'react';
 import { DndContext } from "@dnd-kit/core";
 import { SortableContext, useSortable, arrayMove } from "@dnd-kit/sortable";
@@ -13,6 +34,14 @@ import { useParams, useLocation } from "react-router-dom";
 import playButton from "../assets/play_button.png"
 import stopButton from "../assets/stop_button.png"
 import { useNavigate } from "react-router-dom";
+import { acquireLock } from "../lock_handling.jsx";
+import { releaseLock } from "../lock_handling.jsx";
+import { safeDeleteBoard } from "../lock_handling.jsx";
+import { acquireProjectSessionLock,
+         refreshProjectSessionLock, 
+         releaseProjectSessionLock } from "../lock_handling.jsx";
+
+
 
 function SortableBoard(props) {
   const { id, board, onDoubleClick } = props;
@@ -104,7 +133,8 @@ async function handleShotConflicts(projectID, newShot, ignoreID = null) {
     if (boardAtCurrentShot && (!ignoreID || boardAtCurrentShot.id !== ignoreID)) {
       boardsToShift.push(boardAtCurrentShot);
       currentShot++;
-    } else {
+    }
+    else {
       break;
     }
   }
@@ -174,15 +204,138 @@ const handleAddBoard = async (e) => {
     
   };
 
+//Triggers after first render, when there is different URL, and if a user leaves
+//Aquires the project session lock so the project can't be deleted
+useEffect(() => {
+  if (!id) return;
+   
+  const projectId = parseInt(id);
+  
+  //Acquire a project session lock for this specific project 
 
-//Runs the fetchBoards function after the first render
-//So that the boards show up 
+  acquireProjectSessionLock(projectId);
+  
+  //This function will be called whenever the user does something in the project
+  //moving their mouse for example
+  const refreshLock = () => {
+    refreshProjectSessionLock(projectId);
+  };
+
+  //Events to tell if a user is still using the complication
+  const events = ['mousemove', 'keypress', 'click', 'scroll'];
+  
+  //For each of those user actions, set up a listener that calls our refreshLock function
+  events.forEach(event => {
+    document.addEventListener(event, refreshLock);
+  });
+
+  //Runs when the user leaves the project (when a component unmounts)
+  return () => {
+    //Removes all event listeners previously set up
+    events.forEach(event => {
+      document.removeEventListener(event, refreshLock);
+    });
+    
+    //Releases the lock
+    releaseProjectSessionLock(projectId);
+  };
+  //project ID
+}, [id]); 
+
+//Runs the fetchBoards function after the first rende So that the boards and data show up 
+//Empty array means to only run once after the initial render
+//The argument controls when the effect runs ( [] )
+//Exp: 
 useEffect(() => {
   fetchBoards();
   fetchInfo(); 
 }, []);
 
-console.log(boards);
+
+//Update frontend for all clients if any client makes a change to the boards table
+useEffect(() => {
+  if (!id) return; 
+  //A channel is just an webSocket object that listens for database 
+  //changes 
+  const channel = supabase 
+  //channel name
+  .channel(`project-${id}-boards`)
+  //.on tells the channel specifically what to look for. In this instance it 
+  //it looking for any post_gres changes
+  
+  // Listen for INSERT events - when new boards are added
+  .on(
+    'postgres_changes', 
+    {
+      event: 'INSERT', 
+      schema: 'public', 
+      table: 'boards', 
+      filter: `project_id=eq.${id}`
+    },
+    //The payload is just the message supabase sends that details the changes made to the database
+    //This function is the event handler - whenever a change is made to the database 
+    //this function is called (with the payload parameter)
+    (payload) => {
+      console.log('Board INSERT:', payload)
+      fetchBoards(); 
+      fetchInfo();
+    }
+  )
+  
+  // Listen for UPDATE events - when boards are modified
+.on(
+  'postgres_changes', 
+  {
+    event: 'UPDATE', 
+    schema: 'public', 
+    table: 'boards', 
+    filter: `project_id=eq.${id}`
+  },
+  (payload) => {
+    console.log('Board UPDATE:', payload);
+
+    // Refresh boards and info
+    fetchBoards(); 
+    fetchInfo();
+
+    // Update selectedBoard if it's the one that changed
+    setSelectedBoard((prev) => {
+      if (prev && prev.id === payload.new.id) {
+        return { ...prev, ...payload.new };
+      }
+      return prev;
+    });
+  }
+)
+  
+  // Listen for DELETE events - when boards are removed
+  // Note: DELETE events don't support filters, so we fetch ALL deletes and refresh
+  .on(
+    'postgres_changes', 
+    {
+      event: 'DELETE', 
+      schema: 'public', 
+      table: 'boards'
+    },
+
+    (payload) => {
+      console.log('Board DELETE detected:', payload)
+      // For DELETE events, we can't filter by project_id, so we refresh regardless
+      // This is safe because fetchBoards() only gets boards for our project
+      console.log('Refreshing due to DELETE event')
+      fetchBoards(); 
+      fetchInfo();
+    }
+  )
+
+  //.subscribe is needed to actually get the Realtime updates from other 
+  //clients - events won't actually start being sent until you subscribe to this channel
+  .subscribe(); 
+
+  return () => {
+    channel.unsubscribe();
+  }
+}, [id]);
 
 //Used to get the board info from the database and 
 //sort by Scene-Shot order
@@ -256,27 +409,6 @@ const updateBoard = async (boardId, updatedFields) => {
   fetchInfo(); 
 }
 
-//Allows a user to delete a board
-const deleteBoard = async (id) => {
-
-  const {data, error} = await supabase
-    .from("boards")
-    .delete()
-    .eq("id", id);
-
-  if (error) {
-    console.error("Error deleting board: ", error.message);
-    return;
-  }
-
-  // Remove deleted board from local state
-  //Creates a new array containing all the boards except for the 
-  //one with the ID we are trying to delete
-  setBoards((prev) => prev.filter((b) => b.id !== id));
-  setInfoBoards((prev) => prev.filter((b) => b.id !== id));
-
-}
-
 //Updates the shot of a board whenever boards are shifted around
 //This needs to be better to deal with scenes 
 async function renumber(list) {
@@ -301,7 +433,6 @@ async function renumber(list) {
       const newIndex = items.findIndex((i) => i.id === over.id);
       const reordered = arrayMove(items, oldIndex, newIndex);
       renumber(reordered); // update indexes
-
       setInfoBoards(reordered.map(({ id, title, shot }) => ({ id, title, shot })));
       return reordered
     });
@@ -414,12 +545,34 @@ async function renumber(list) {
         <p><strong>Lens Focal Length:</strong> {selectedBoard.lens_focal_mm}</p>
 
         <GeneralButton message="Clear Info" onClick={() => setSelectedBoard(null)}>Clear Info</GeneralButton>
+      <GeneralButton 
+        onClick={async () => {
+          const acquired = await acquireLock(selectedBoard.id);
+          if (acquired) {
+            setEditModalOpen(true);
+          } else {
+            alert('This board is currently being edited by someone else.');
+          }
+        }}
+        message="Edit Board"
+      >
+        Edit Board
+      </GeneralButton>
         <GeneralButton 
-          onClick={() => setEditModalOpen(true)}
-          message = "Edit Board"
-          >Edit Board
-        </GeneralButton>
-        <GeneralButton message = "Delete Board" onClick={() => deleteBoard(selectedBoard.id) && setSelectedBoard(null)}>Delete Board</GeneralButton>
+          message="Delete Board" 
+          onClick={async () => {
+            try {
+            await safeDeleteBoard(selectedBoard.id);
+
+            setBoards(prev => prev.filter(b => b.id !== selectedBoard.id));
+            setInfoBoards(prev => prev.filter(b => b.id !== selectedBoard.id));
+            setSelectedBoard(null);
+          } 
+          catch (error) {
+            alert(error.message);
+          }
+          }}
+>Delete Board</GeneralButton>
       </div>
     ) : (
       <p className="board-placeholder">Click a board to see details</p>
@@ -486,7 +639,10 @@ async function renumber(list) {
       <EditModal
         message = "Edit Board"
         open={editModalOpen}
-        onClose={() => setEditModalOpen(false)}
+        onClose={async () => {
+          await releaseLock(selectedBoard.id);
+          setEditModalOpen(false);
+        }}
         selectedBoard={selectedBoard}
         setSelectedBoard={setSelectedBoard}
         onSubmit={() => {
