@@ -20,7 +20,8 @@ This project is currently in progress. Core features for creating storyboards an
 - Record metadata such as camera angle, lens focal length, transitions, and duration  
 - Maintain relationships between projects, scenes, and boards using a relational schema
 - Real-time editing
-- Drag and drop organization
+- Drag and drop board organization
+- Local frontend render when a change is made to the database
 
 ---
 
@@ -75,6 +76,33 @@ Below is the current PostgreSQL schema implemented in Supabase.
 | project_id       | int8 (FK→projects.id) | Associated project       |
 | image_url        | text        | Link to uploaded storyboard image  |
 
+### `non_exclusive_locks`
+
+| Column          | Type        | Description                              |
+|-----------------|-------------|------------------------------------------|
+| **resource_type** | text      | Type of the resource being locked *(PK)* |
+| **resource_id**   | int4      | ID of the resource *(PK)*               |
+| **locked_by**     | text      | User holding the non-exclusive lock *(PK)* |
+| expires_at      | timestamptz | When the lock expires                    |
+| created_at      | timestamptz | Timestamp when the lock was created      |
+| updated_at      | timestamptz | Timestamp when the lock was last updated |
+
+**Primary Key:** `(resource_type, resource_id, locked_by)`
+
+
+### `exclusive_locks`
+
+| Column          | Type        | Description                              |
+|-----------------|-------------|------------------------------------------|
+| **resource_type** | text      | Type of the resource being locked *(PK)* |
+| **resource_id**   | int4      | ID of the resource *(PK)*               |
+| locked_by       | text        | User holding the exclusive lock          |
+| expires_at      | timestamptz | When the lock expires                    |
+| created_at      | timestamptz | Timestamp when the lock was created      |
+| updated_at      | timestamptz | Timestamp when the lock was last updated |
+
+**Primary Key:** `(resource_type, resource_id)`
+
 ---
 
 ## Roadmap
@@ -84,3 +112,4 @@ Below is the current PostgreSQL schema implemented in Supabase.
 - Project sharing and export options
 - Improved stylization
 - Animatic Functionality
+
