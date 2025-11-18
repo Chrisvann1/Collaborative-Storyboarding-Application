@@ -14,9 +14,13 @@ This project is currently in progress. Core features for creating storyboards an
 
 - Create and manage projects and scenes  
 - Add boards within scenes containing titles, descriptions, and visual elements  
-- Upload and preview images for storyboard panels  
+- Upload and preview images for storyboard panels
+- Locking functionality for collaborative functionality
+  - Example: If someone is editing a project, another user cannot delete that project
 - Record metadata such as camera angle, lens focal length, transitions, and duration  
-- Maintain relationships between projects, scenes, and boards using a relational schema  
+- Maintain relationships between projects, scenes, and boards using a relational schema
+- Real-time editing
+- Drag and drop organization
 
 ---
 
