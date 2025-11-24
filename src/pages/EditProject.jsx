@@ -72,6 +72,9 @@ function SortableBoard(props) {
 //I need to figure out how the dnd-kit works
 //I also need to figure out the useState and how that is being used for the modal
 export default function EditProject() {
+
+
+
   //Returns an object with keys for each dynamic URL segment 
   //So in the case of /projects/5 - 5 would be returned
   const { id } = useParams();
@@ -636,20 +639,25 @@ async function renumber(list) {
           setNewBoard={setNewBoard}
           onSubmit={handleAddBoard}
         />
-      <EditModal
-        message = "Edit Board"
-        open={editModalOpen}
-        onClose={async () => {
-          await releaseLock(selectedBoard.id);
-          setEditModalOpen(false);
-        }}
-        selectedBoard={selectedBoard}
-        setSelectedBoard={setSelectedBoard}
-        onSubmit={() => {
-        updateBoard(selectedBoard.id, selectedBoard); // pass ID + updated fields
-        setEditModalOpen(false);
-      }}
-    />
+        <EditModal
+          message="Edit Board"
+          open={editModalOpen}
+          onClose={async () => {
+            await releaseLock(selectedBoard.id);
+            setEditModalOpen(false);
+          }}
+          selectedBoard={selectedBoard}
+          setSelectedBoard={setSelectedBoard}
+          // ONLY called on actual Submit click
+          onSubmit={async (boardId, updatedFields) => {
+            await updateBoard(boardId, updatedFields); // save changes
+            setEditModalOpen(false);                   // close modal
+          }}
+          // NEW: add separate save function for typing
+          onAutoSave={async (updatedFields) => {
+            await updateBoard(selectedBoard.id, updatedFields); // save but do NOT close
+          }}
+        />
       </div>
 
 

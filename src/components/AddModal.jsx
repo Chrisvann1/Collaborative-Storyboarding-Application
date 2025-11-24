@@ -77,17 +77,6 @@ async function handleImageUpload(e) {
           onChange={(e) => setNewBoard({ ...newBoard, title: e.target.value })}
         />
 
-        {/* Scene - Add back later if there is time
-        <input
-          type="number"
-          placeholder="Scene (REQUIRED)"
-          //If newBoard.scene is null or undefined, return an empty string
-          value={newBoard.scene ?? ""}
-          onChange={(e) => setNewBoard({ ...newBoard, scene: e.target.value })}
-        />
-
-        */}
-
         {/* Shot */}
         <input
           type="number"

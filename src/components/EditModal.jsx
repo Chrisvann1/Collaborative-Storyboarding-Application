@@ -1,7 +1,8 @@
 import styles from "./EditModal.module.css"
 import { supabase } from "../supabase-client.js";
+import { useRef } from "react"
 
-export default function Modal({ message, open, onClose, selectedBoard, setSelectedBoard, onSubmit }) {
+export default function Modal({ message, open, onClose, selectedBoard, setSelectedBoard, onSubmit, onAutoSave}) {
   if (!open || !selectedBoard) return null;
 
   // Wrapper to handle type conversion and submission
@@ -51,6 +52,30 @@ async function handleImageUpload(e) {
   setSelectedBoard({ ...selectedBoard, image_url: urlData.publicUrl });
 }
 
+
+//useRef saves variable value between renders
+//Meaning a re-render will not cause the value to reset
+//useRef instead of useState because useState causes re-renders, leading to hundreds 
+//of unnessecary re-renders
+const saveTimer = useRef(null);
+
+//If the user stops updating/typing for 350ms, then onSubmit is called which updates the database 
+async function debouncedSave(updatedBoard) {
+  //Clears any existing timer so it doesn't trigger a save
+  //This would cause a save on every change after 350ms if the timer 
+  //was not cleared
+  if (saveTimer.current) clearTimeout(saveTimer.current);
+
+  // Start a new timer, once 350ms, use onSubmit
+  saveTimer.current = setTimeout(async () => {
+    console.log("Saving to database...");
+
+    //Call the parent submit function which updates the database
+    onAutoSave(updatedBoard);
+  }, 350);
+}
+
+
   return (
     <div className={styles.modal}>
       <div className={styles.overlay} onClick={onClose}></div>
@@ -75,43 +100,53 @@ async function handleImageUpload(e) {
           type="text"
           //Double question mark - If selectedBoard.title is null or undefined, use an empty string
           value={selectedBoard.title ?? ""}
-          onChange={(e) => setSelectedBoard({ ...selectedBoard, title: e.target.value })}
+          onChange={(e) => {
+            const updated = { ...selectedBoard, title: e.target.value }; // full updated board
+            setSelectedBoard(updated); // update local state
+            debouncedSave(updated);    // trigger debounced save
+          }}
         />
-
-        {/* Scene - Add back later if time
-        <input
-          type="number"
-          //If selectedBoard.scene is null or undefined, return an empty string
-          value={selectedBoard.scene ?? ""}
-          onChange={(e) => setSelectedBoard({ ...selectedBoard, scene: e.target.value })}
-        />
-
-        */}
 
         {/* Shot */}
         <input
           type="number"
           value={selectedBoard.shot ?? ""}
-          onChange={(e) => setSelectedBoard({ ...selectedBoard, shot: e.target.value })}
+          onChange={(e) => {
+            const updated = { ...selectedBoard, shot: e.target.value }; 
+            setSelectedBoard(updated); 
+            debouncedSave(updated);   
+          }}
         />
 
         {/* Description */}
         <textarea
           value={selectedBoard.description ?? ""}
-          onChange={(e) => setSelectedBoard({ ...selectedBoard, description: e.target.value })}
+          onChange={(e) => {
+            const updated = { ...selectedBoard, description: e.target.value }; 
+            setSelectedBoard(updated); 
+            debouncedSave(updated);    
+          }}
         />
 
         {/* Duration */}
         <input
           type="number"
           value={selectedBoard.duration ?? ""}
-          onChange={(e) => setSelectedBoard({ ...selectedBoard, duration: e.target.value })}
+          onChange={(e) => {
+            const updated = { ...selectedBoard, duration: e.target.value }; 
+            setSelectedBoard(updated); 
+            debouncedSave(updated);    
+          }}
         />
 
         {/* Transition */}
         <select
           value={selectedBoard.transition ?? ""}
-          onChange={(e) => setSelectedBoard({ ...selectedBoard, transition: e.target.value })}
+          onChange={(e) => {
+            const updated = { ...selectedBoard, transition: e.target.value }; 
+            setSelectedBoard(updated); 
+            debouncedSave(updated);    
+          }}
         >
           <option value="">Select Transition</option>
           <option value="cut">Cut</option>
@@ -123,7 +158,11 @@ async function handleImageUpload(e) {
         {/* Aspect Ratio */}
         <select
           value={selectedBoard.aspect_ratio ?? ""}
-          onChange={(e) => setSelectedBoard({ ...selectedBoard, aspect_ratio: e.target.value })}
+          onChange={(e) => {
+            const updated = { ...selectedBoard, aspect_ratio: e.target.value }; 
+            setSelectedBoard(updated); 
+            debouncedSave(updated);    
+          }}
         >
           <option value="">Aspect Ratio</option>
           <option value="16:9">16:9</option>
@@ -134,7 +173,11 @@ async function handleImageUpload(e) {
         {/* Camera Angle */}
         <select
           value={selectedBoard.camera_angle ?? ""}
-          onChange={(e) => setSelectedBoard({ ...selectedBoard, camera_angle: e.target.value })}
+          onChange={(e) => {
+            const updated = { ...selectedBoard, camera_angle: e.target.value }; 
+            setSelectedBoard(updated); 
+            debouncedSave(updated);    
+          }}
         >
           <option value="">Camera Angle</option>
           <option value="eye-level">Eye-level</option>
@@ -146,7 +189,11 @@ async function handleImageUpload(e) {
         {/* Camera Movement */}
         <select
           value={selectedBoard.camera_movement ?? ""}
-          onChange={(e) => setSelectedBoard({ ...selectedBoard, camera_movement: e.target.value })}
+          onChange={(e) => {
+            const updated = { ...selectedBoard, camera_movement: e.target.value }; 
+            setSelectedBoard(updated); 
+            debouncedSave(updated);    
+          }}
         >
           <option value="">Camera Movement</option>
           <option value="static">Static</option>
@@ -159,7 +206,11 @@ async function handleImageUpload(e) {
         {/* Lens */}
         <select
           value={selectedBoard.lens_focal_mm ?? ""}
-          onChange={(e) => setSelectedBoard({ ...selectedBoard, lens_focal_mm: e.target.value })}
+          onChange={(e) => {
+            const updated = { ...selectedBoard, lens_focal_mm: e.target.value }; 
+            setSelectedBoard(updated); 
+            debouncedSave(updated);    
+          }}
         >
           <option value="">Lens (mm)</option>
           <option value="18mm">18mm</option>
