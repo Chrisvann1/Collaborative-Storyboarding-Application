@@ -1,51 +1,70 @@
 import styles from "./AddModal.module.css";
 import { supabase } from "../supabase-client"; 
 
-//Uses props for opening, closing, and providing a message
-//The values passed in for creating a new board can be found in EditProject.jsx
-//If !open - do not return anything from this function meaning the modal is closed 
-//Clicking on Overlay or the close button closes the Modal (overlay being everything that's not in the modal)
-//Close button also closes it
-//div (division)- basic container in HTML
-  //Block level container - an element that starts on a new line and takes full available width
-//onClose sets Open to false in EditProject.jsx
-// Modal.jsx
-
 export default function Modal({ message, open, onClose, newBoard, setNewBoard, onSubmit }) {
   if (!open) return null;
 
   //Image upload handle function 
-async function handleImageUpload(e) {
-  const file = e.target.files[0]; 
-  if (!file) return; 
+  async function handleImageUpload(e) {
+    const file = e.target.files[0]; 
+    if (!file) return; 
 
-  const safeName = file.name
-    //Replace spaces with
-    .replace(/\s+/g, "_") 
-    //Removes other invalid characters
-    .replace(/[^a-zA-Z0-9._-]/g, ""); 
+    const safeName = file.name
+      //Replace spaces with
+      .replace(/\s+/g, "_") 
+      //Removes other invalid characters
+      .replace(/[^a-zA-Z0-9._-]/g, ""); 
 
-  // Unique name for the image
-  const fileName = `${Date.now()}-${safeName}`;
+    // Unique name for the image
+    const fileName = `${Date.now()}-${safeName}`;
 
-  const { data, error } = await supabase.storage
-    .from("images")
-    .upload(fileName, file);
+    const { data, error } = await supabase.storage
+      .from("images")
+      .upload(fileName, file);
 
-  if (error) {
-    console.error("Image upload failed:", error);
-    alert("Upload failed");
-    return;
+    if (error) {
+      console.error("Image upload failed:", error);
+      alert("Upload failed");
+      return;
+    }
+
+    // Get public URL
+    const { data: urlData } = supabase.storage
+      .from("images")
+      .getPublicUrl(fileName);
+
+    // Add image_url to the new board
+    setNewBoard({ ...newBoard, image_url: urlData.publicUrl });
   }
 
-  // Get public URL
-  const { data: urlData } = supabase.storage
-    .from("images")
-    .getPublicUrl(fileName);
+  // Handle image deletion
+  async function handleImageDelete() {
+    if (!newBoard.image_url) return;
 
-  // Add image_url to the new board
-  setNewBoard({ ...newBoard, image_url: urlData.publicUrl });
-}
+    try {
+      // Extract filename from URL
+      const urlParts = newBoard.image_url.split('/');
+      const fileName = urlParts[urlParts.length - 1];
+
+      // Delete from storage
+      const { error } = await supabase.storage
+        .from("images")
+        .remove([fileName]);
+
+      if (error) {
+        console.error("Image deletion failed:", error);
+        alert("Failed to delete image");
+        return;
+      }
+
+      // Update state to remove image URL
+      setNewBoard({ ...newBoard, image_url: null });
+      
+    } catch (error) {
+      console.error("Error deleting image:", error);
+      alert("Error deleting image");
+    }
+  }
 
   return (
     <div className={styles.modal}>
@@ -61,11 +80,20 @@ async function handleImageUpload(e) {
 
         {/*Image Preview*/}
         {newBoard.image_url && (
-          <img
-            src={newBoard.image_url}
-            alt="Preview"
-            style={{ marginTop: "10px", maxWidth: "10%", height: "auto", maxHeight: "10%", borderRadius: "5px" }}
-          />
+          <div className={styles.image_preview_container}>
+            <img
+              src={newBoard.image_url}
+              alt="Preview"
+              className={styles.image_preview}
+            />
+            <button 
+              type="button"
+              onClick={handleImageDelete}
+              className={styles.delete_image_btn}
+            >
+              Delete Image
+            </button>
+          </div>
         )}
 
         {/* Title */}

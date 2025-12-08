@@ -102,7 +102,18 @@ export default function EditProject() {
   //Used for setting the information in the left container
   const [infoBoards, setInfoBoards] = useState([]);
 
-//Cascasding and recursive renumbering to deal with conflicts
+  //Opening and closing the Modal
+  //Sets ModelOpen to false initially
+  //ModelsetOpen - setter function to change the value of Modalopen
+  //This is for the add board modal
+  const [Modalopen, ModalsetOpen] = useState(false);
+
+
+  //This is for the edit baord modal
+  const [editModalOpen, setEditModalOpen] = useState(false);
+
+
+  //Cascasding and recursive renumbering to deal with conflicts
 async function handleShotConflicts(projectID, newShot, ignoreID = null) {
   
   // Get ALL boards in the project ordered by shot
@@ -258,13 +269,9 @@ useEffect(() => {
 //Update frontend for all clients if any client makes a change to the boards table
 useEffect(() => {
   if (!id) return; 
-  //A channel is just an webSocket object that listens for database 
-  //changes 
+  
   const channel = supabase 
-  //channel name
   .channel(`project-${id}-boards`)
-  //.on tells the channel specifically what to look for. In this instance it 
-  //it looking for any post_gres changes
   
   // Listen for INSERT events - when new boards are added
   .on(
@@ -275,9 +282,6 @@ useEffect(() => {
       table: 'boards', 
       filter: `project_id=eq.${id}`
     },
-    //The payload is just the message supabase sends that details the changes made to the database
-    //This function is the event handler - whenever a change is made to the database 
-    //this function is called (with the payload parameter)
     (payload) => {
       console.log('Board INSERT:', payload)
       fetchBoards(); 
@@ -297,13 +301,14 @@ useEffect(() => {
   (payload) => {
     console.log('Board UPDATE:', payload);
 
-    // Refresh boards and info
+    // FIXED: Always update the boards list so other users see changes
+    // But don't update the selectedBoard if it's currently being edited
     fetchBoards(); 
     fetchInfo();
 
-    // Update selectedBoard if it's the one that changed
+    // Update selectedBoard only if it's NOT currently being edited in the modal
     setSelectedBoard((prev) => {
-      if (prev && prev.id === payload.new.id) {
+      if (prev && prev.id === payload.new.id && !editModalOpen) {
         return { ...prev, ...payload.new };
       }
       return prev;
@@ -312,7 +317,6 @@ useEffect(() => {
 )
   
   // Listen for DELETE events - when boards are removed
-  // Note: DELETE events don't support filters, so we fetch ALL deletes and refresh
   .on(
     'postgres_changes', 
     {
@@ -320,25 +324,27 @@ useEffect(() => {
       schema: 'public', 
       table: 'boards'
     },
-
     (payload) => {
       console.log('Board DELETE detected:', payload)
-      // For DELETE events, we can't filter by project_id, so we refresh regardless
-      // This is safe because fetchBoards() only gets boards for our project
-      console.log('Refreshing due to DELETE event')
+      
+      // If the deleted board is the one being edited, close the modal
+      if (editModalOpen && selectedBoard && selectedBoard.id === payload.old.id) {
+        setEditModalOpen(false);
+        setSelectedBoard(null);
+      }
+      
       fetchBoards(); 
       fetchInfo();
     }
   )
-
-  //.subscribe is needed to actually get the Realtime updates from other 
-  //clients - events won't actually start being sent until you subscribe to this channel
   .subscribe(); 
 
   return () => {
     channel.unsubscribe();
   }
-}, [id]);
+}, [id, editModalOpen, selectedBoard]);
+
+
 
 //Used to get the board info from the database and 
 //sort by Scene-Shot order
@@ -380,36 +386,40 @@ const fetchInfo = async () => {
 
 //Allows a user to update an existing board
 const updateBoard = async (boardId, updatedFields) => {
-  const { data: currentBoard, error: fetchError } = await supabase
-    .from("boards")
-    .select("shot")
-    .eq("id", boardId)
-    .single();
+  
+  try {
+    // Handle shot conflicts only if shot is being updated
+    if (updatedFields.shot !== undefined) {
+      const { data: currentBoard, error: fetchError } = await supabase
+        .from("boards")
+        .select("shot")
+        .eq("id", boardId)
+        .single();
 
-  if (fetchError) {
-    console.error("Error fetching current board:", fetchError.message);
-    return;
+      if (!fetchError) {
+        const currentShot = Number(currentBoard.shot);
+        const newShot = Number(updatedFields.shot);
+
+        if (newShot !== currentShot) {
+          await handleShotConflicts(id, newShot, boardId); 
+        }
+      }
+    }
+
+    // update the database - real-time subscriptions will handle UI updates
+    const {error} = await supabase 
+      .from("boards")
+      .update(updatedFields)
+      .eq("id", boardId);
+
+    if (error) {
+      console.error("Error updating board", error.message);
+      return;
+    }
+    
+  } catch (error) {
+    console.error("Error in updateBoard:", error.message);
   }
-
-  const currentShot = Number(currentBoard.shot);
-  const newShot = Number(updatedFields.shot);
-
-  if (newShot !== currentShot) {
-    await handleShotConflicts(id, newShot, boardId); 
-  }
-
-  const {error} = await supabase 
-    .from("boards")
-    .update(updatedFields)
-    .eq("id", boardId);
-
-  if (error) {
-    console.error("Error updating board", error.message);
-    return;
-  }
-
-  fetchBoards();
-  fetchInfo(); 
 }
 
 //Updates the shot of a board whenever boards are shifted around
@@ -440,17 +450,6 @@ async function renumber(list) {
       return reordered
     });
   }
-
-  //Opening and closing the Modal
-  //Sets ModelOpen to false initially
-  //ModelsetOpen - setter function to change the value of Modalopen
-  //This is for the add board modal
-  const [Modalopen, ModalsetOpen] = useState(false);
-
-
-  //This is for the edit baord modal
-  const [editModalOpen, setEditModalOpen] = useState(false);
-
 
   //Used to get the title from the URL
   const location = useLocation(); 
@@ -510,6 +509,7 @@ async function renumber(list) {
         >Back to Projects
       </GeneralButton>
       <h2>Title: {decodeURIComponent(title)}</h2>
+      {/*
       <GeneralButton 
         message = "Redo"
         >Redo
@@ -522,6 +522,7 @@ async function renumber(list) {
         message = "Share"
         > Share 
       </GeneralButton>
+      */}
       <GeneralButton 
         message = "Export"
         > Export
@@ -653,9 +654,9 @@ async function renumber(list) {
             await updateBoard(boardId, updatedFields); // save changes
             setEditModalOpen(false);                   // close modal
           }}
-          // NEW: add separate save function for typing
+          // separate save function for typing (does not close modal)
           onAutoSave={async (updatedFields) => {
-            await updateBoard(selectedBoard.id, updatedFields); // save but do NOT close
+            await updateBoard(selectedBoard.id, updatedFields);
           }}
         />
       </div>

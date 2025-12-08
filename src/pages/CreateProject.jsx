@@ -3,7 +3,7 @@ import { useState } from 'react';
 import { useEffect } from 'react';
 import ProjectButton from "../components/CreateProjectButton.jsx"
 import ProjectModal from "../components/CreateProjectModal.jsx"
-import UpdateProjectModal from "../components/UpdateProjectModal.jsx"
+import EditProjectModal from "../components/EditProjectModal.jsx"
 import { useNavigate } from "react-router-dom";
 import { acquireProjectEditLock, 
          releaseProjectEditLock, 
@@ -30,7 +30,7 @@ export default function CreateProject() {
   const [projects, setProjects] = useState([]);
 
   //For selecting a project (if you click on edit or delete that is the selected project)
-  const [selectedProject, setSelectedProject] = useState([null]);
+  const [selectedProject, setSelectedProject] = useState(null);
 
   //Track which project id we currently hold an edit lock for
   const [lockedProjectId, setLockedProjectId] = useState(null);
@@ -124,69 +124,24 @@ export default function CreateProject() {
 
   }
 
-  //Allows for project updates (with lock functionality)
-  const handleUpdateProject = async (id, updatedFields) => {
-     // Try to acquire edit lock first
-    try {
-    const acquired = await acquireProjectEditLock(id);
-    //alert if the lock is not acquired
-    if (!acquired) {
-      alert('This project is currently being edited by someone else.');
-      return;
-    }
+//Handles updating project fields
+const handleUpdateProject = async (id, updatedFields) => {
+  // Just do the update - lock was already acquired when modal opened
+  const {error} = await supabase 
+    .from("projects")
+    .update(updatedFields)
+    .eq("id", id);
 
-    //If the lock is acquired - you can do the update
-    const {error} = await supabase 
-      .from("projects")
-      .update(updatedFields)
-      .eq("id", id);
-
-      if (error) {
-        console.error("Error updating project", error.message);
-        return;
-      }
+  if (error) {
+    console.error("Error updating project", error.message);
+    return false;
+  }
 
   //refresh projects
   fetchProjects();
-  setUpdateModalOpen(false);
-  setSelectedProject(null);
-  }
-
-  //Release the lock no matter what - even if there is an error in one of the 
-  //other functions
-  finally {
-    await releaseProjectEditLock(id);
-  }
+  
+  return true; // Return true to indicate success
 }
-
-//This doesn't need to be done through the frontend anymore because there is a postgreSQL
-//function that handles the delete
-/*
-  //handles a user deleting a project
-  const handleDeleteProject = async (id) => {
-    const {error1} = await supabase 
-      .from("boards")
-      .delete()
-      .eq("project_id", id); 
-
-    if (error1) {
-      console.error("Error deleting boards associated with the project: ", error1.message);
-      return; 
-    }
-
-    const {error2} = await supabase 
-      .from("projects")
-      .delete()
-      .eq("id", id); 
-
-    if (error2) {
-      console.error("Error deleting project: ", error2.message);  
-    }
-
-    fetchProjects();
-  }
-
-*/
 
 //Deletes a project (first checking the 2 locks through the safeDeleteProject function)
 const handleDeleteProject = async (id) => {
@@ -223,8 +178,8 @@ const handleDeleteProject = async (id) => {
         onSubmit={handleAddProject}
     />
 
-    <UpdateProjectModal
-      message = "Update Project"
+    <EditProjectModal
+      message = "Edit Project"
       open = {updateModalOpen}
       onClose={async () => {
         // release lock
@@ -237,17 +192,22 @@ const handleDeleteProject = async (id) => {
       }}
       updateProject = {selectedProject}
       setUpdatedProject = {setSelectedProject}
-      onSubmit={handleUpdateProject}
+      onSubmit={async (id, updatedFields) => {
+        await handleUpdateProject(id, updatedFields);
+        setUpdateModalOpen(false);
+        setSelectedProject(null);
+      }}
+      onAutoSave={async (updatedFields) => {
+        await handleUpdateProject(selectedProject.id, updatedFields); // save but do NOT close
+      }}
     />
 
     
-
-    {/*Projects Container */}
 {/* Projects container */}
   <div className="projects_container">
         {projects.map((project) => (
           <div
-            key={project.id} // ✅ key on the top-level element
+            key={project.id} 
             className="project_card"
             onClick={() => navigate(`/projects/${project.id}`)}
           >

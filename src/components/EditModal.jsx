@@ -1,80 +1,169 @@
 import styles from "./EditModal.module.css"
 import { supabase } from "../supabase-client.js";
-import { useRef } from "react"
+import { useRef, useState, useEffect } from "react"
 
 export default function Modal({ message, open, onClose, selectedBoard, setSelectedBoard, onSubmit, onAutoSave}) {
   if (!open || !selectedBoard) return null;
 
-  // Wrapper to handle type conversion and submission
-  const handleSubmit = () => {
-    // Convert number fields before sending
-    const updated = {
-      ...selectedBoard,
-      scene: selectedBoard.scene !== "" ? Number(selectedBoard.scene) : null,
-      shot: selectedBoard.shot !== "" ? Number(selectedBoard.shot) : null,
-      duration: selectedBoard.duration !== "" ? Number(selectedBoard.duration) : null,
-      lens_focal_mm: selectedBoard.lens_focal_mm?.replace("mm", "") 
-        ? Number(selectedBoard.lens_focal_mm.replace("mm", "")) 
+// Local UI variables for the board currently being edited.
+// This state is used immediate feedback so the UI updates instantly
+// as the user types rather than relying 
+// strictly on the database updates
+const [displayBoard, setDisplayBoard] = useState(selectedBoard);
+
+// Ref used to store the active debounce timer ID.
+// Because timers must persist across renders without triggering re-renders,
+// a ref is the correct storage location.
+const saveTimeoutRef = useRef(null);
+
+// Ref that always holds the MOST RECENT version of the board.
+// This prevents stale closure issues inside the debounced setTimeout callback,
+// ensuring auto-save always reads the latest state.
+const latestDisplayBoardRef = useRef(selectedBoard);
+
+/*
+ * 
+ * The 2nd line allows for fast UI updates that happen locally while typing
+ * 
+ * The 3rd line is neseccary to save data locally if there is a change to 
+ * selectedBoard during the 300ms or from database latency (to prevent lag
+ * or cut off data)
+*/
+useEffect(() => {
+  setDisplayBoard(selectedBoard);                 
+  latestDisplayBoardRef.current = selectedBoard; 
+}, [selectedBoard]);
+
+
+/**
+ * Debounced field change handler.
+ *
+ * Responsibilities:
+ * 1. Instantly update UI for responsive typing.
+ * 2. Keep latestDisplayBoardRef synchronized for auto-save reliability.
+ * 3. Sync changes to parent state.
+ * 4. Debounce saves so the database is not spammed.
+ * 5. Save the ENTIRE board object as a single atomic update.
+ */
+const handleFieldChange = (field, value) => {
+  // Create a new board object with the updated field.
+  // This preserves immutability and triggers React re-render correctly.
+  const updatedDisplayBoard = { ...displayBoard, [field]: value };
+
+  // Immediate UI update so user sees their input with zero latency.
+  setDisplayBoard(updatedDisplayBoard);
+
+  // Update the ref so the debounced save always uses the latest data,
+  // even if additional renders occur before the timeout fires.
+  latestDisplayBoardRef.current = updatedDisplayBoard;
+  
+  // Keep the parent component synchronized with the local UI state.
+  setSelectedBoard(updatedDisplayBoard);
+  
+  // Clear any previously scheduled save.
+  if (saveTimeoutRef.current) {
+    clearTimeout(saveTimeoutRef.current);
+  }
+  
+  // Schedule a new debounced save.
+  saveTimeoutRef.current = setTimeout(() => {
+    // Read the most current board safely from the ref.
+    const currentBoard = latestDisplayBoardRef.current;
+    
+    const processedBoard = {
+      ...currentBoard,
+      shot: currentBoard.shot !== "" ? Number(currentBoard.shot) : null,
+      duration: currentBoard.duration !== "" ? Number(currentBoard.duration) : null,
+      lens_focal_mm: currentBoard.lens_focal_mm?.replace("mm", "") 
+        ? Number(currentBoard.lens_focal_mm.replace("mm", "")) 
         : null
     };
-    // Call parent submit function
+    
+    // Persist the ENTIRE current state of the board.
+    // Saving the full object prevents partial overwrites and race conditions.
+    onAutoSave(processedBoard);
+  }, 300); // Short delay to capture rapid typing while minimizing server load
+};
+
+  // Handle image upload
+  async function handleImageUpload(e) {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    const safeName = file.name
+      .replace(/\s+/g, "_")
+      .replace(/[^a-zA-Z0-9._-]/g, "");
+
+    const fileName = `${Date.now()}-${safeName}`;
+
+    const { data, error } = await supabase.storage
+      .from("images")
+      .upload(fileName, file);
+
+    if (error) {
+      console.error("Image upload failed:", error);
+      alert("Upload failed");
+      return;
+    }
+
+    const { data: urlData } = supabase.storage
+      .from("images")
+      .getPublicUrl(fileName);
+
+    handleFieldChange('image_url', urlData.publicUrl);
+  }
+
+  // Handle image deletion
+  async function handleImageDelete() {
+    if (!displayBoard.image_url) return;
+
+    try {
+      // Extract filename from URL
+      const urlParts = displayBoard.image_url.split('/');
+      const fileName = urlParts[urlParts.length - 1];
+
+      // Delete from storage
+      const { error } = await supabase.storage
+        .from("images")
+        .remove([fileName]);
+
+      if (error) {
+        console.error("Image deletion failed:", error);
+        alert("Failed to delete image");
+        return;
+      }
+
+      // Update state to remove image URL
+      handleFieldChange('image_url', null);
+      
+    } catch (error) {
+      console.error("Error deleting image:", error);
+      alert("Error deleting image");
+    }
+  }
+
+  // Wrapper to handle type conversion and submission
+  const handleSubmit = () => {
+    const updated = {
+      ...displayBoard,
+      shot: displayBoard.shot !== "" ? Number(displayBoard.shot) : null,
+      duration: displayBoard.duration !== "" ? Number(displayBoard.duration) : null,
+      lens_focal_mm: displayBoard.lens_focal_mm?.replace("mm", "") 
+        ? Number(displayBoard.lens_focal_mm.replace("mm", "")) 
+        : null
+    };
     onSubmit(selectedBoard.id, updated);
-    // Close modal
     onClose();
   };
 
-  // Handle image upload
-async function handleImageUpload(e) {
-  const file = e.target.files[0];
-  if (!file) return;
-
-  // Sanitize file name
-  const safeName = file.name
-    .replace(/\s+/g, "_")          // replace spaces with _
-    .replace(/[^a-zA-Z0-9._-]/g, ""); // remove any other invalid chars
-
-  const fileName = `${Date.now()}-${safeName}`;
-
-  const { data, error } = await supabase.storage
-    .from("images")
-    .upload(fileName, file);
-
-  if (error) {
-    console.error("Image upload failed:", error);
-    alert("Upload failed");
-    return;
-  }
-
-  const { data: urlData } = supabase.storage
-    .from("images")
-    .getPublicUrl(fileName);
-
-  setSelectedBoard({ ...selectedBoard, image_url: urlData.publicUrl });
-}
-
-
-//useRef saves variable value between renders
-//Meaning a re-render will not cause the value to reset
-//useRef instead of useState because useState causes re-renders, leading to hundreds 
-//of unnessecary re-renders
-const saveTimer = useRef(null);
-
-//If the user stops updating/typing for 350ms, then onSubmit is called which updates the database 
-async function debouncedSave(updatedBoard) {
-  //Clears any existing timer so it doesn't trigger a save
-  //This would cause a save on every change after 350ms if the timer 
-  //was not cleared
-  if (saveTimer.current) clearTimeout(saveTimer.current);
-
-  // Start a new timer, once 350ms, use onSubmit
-  saveTimer.current = setTimeout(async () => {
-    console.log("Saving to database...");
-
-    //Call the parent submit function which updates the database
-    onAutoSave(updatedBoard);
-  }, 350);
-}
-
+  // Cleanup timeout on unmount
+  useEffect(() => {
+    return () => {
+      if (saveTimeoutRef.current) {
+        clearTimeout(saveTimeoutRef.current);
+      }
+    };
+  }, []);
 
   return (
     <div className={styles.modal}>
@@ -82,71 +171,57 @@ async function debouncedSave(updatedBoard) {
       <div className={styles.modal_content}>
         <h2>{message}</h2>
 
-      {/* Image Upload */}
-      <label>Add Image</label>
-      <input type="file" accept="image/*" onChange={handleImageUpload} />
+        <label>Add Image</label>
+        <input type="file" accept="image/*" onChange={handleImageUpload} />
 
-      {/* Image Preview */}
-      {selectedBoard.image_url && (
-        <img
-          src={selectedBoard.image_url}
-          alt="Preview"
-          style={{ marginTop: "10px", maxWidth: "10%", height: "auto", maxHeight: "10%", borderRadius: "5px" }}
-        />
-      )}
+        {displayBoard.image_url && (
+          <div className={styles.image_preview_container}>
+            <img
+              src={displayBoard.image_url}
+              alt="Preview"
+              className={styles.image_preview}
+            />
+            <button 
+              type="button"
+              onClick={handleImageDelete}
+              className={styles.delete_image_btn}
+            >
+              Delete Image
+            </button>
+          </div>
+        )}
 
         {/* Title */}
         <input
           type="text"
-          //Double question mark - If selectedBoard.title is null or undefined, use an empty string
-          value={selectedBoard.title ?? ""}
-          onChange={(e) => {
-            const updated = { ...selectedBoard, title: e.target.value }; // full updated board
-            setSelectedBoard(updated); // update local state
-            debouncedSave(updated);    // trigger debounced save
-          }}
+          value={displayBoard.title ?? ""}
+          onChange={(e) => handleFieldChange('title', e.target.value)}
         />
 
         {/* Shot */}
         <input
           type="number"
-          value={selectedBoard.shot ?? ""}
-          onChange={(e) => {
-            const updated = { ...selectedBoard, shot: e.target.value }; 
-            setSelectedBoard(updated); 
-            debouncedSave(updated);   
-          }}
+          value={displayBoard.shot ?? ""}
+          onChange={(e) => handleFieldChange('shot', e.target.value)}
         />
 
         {/* Description */}
         <textarea
-          value={selectedBoard.description ?? ""}
-          onChange={(e) => {
-            const updated = { ...selectedBoard, description: e.target.value }; 
-            setSelectedBoard(updated); 
-            debouncedSave(updated);    
-          }}
+          value={displayBoard.description ?? ""}
+          onChange={(e) => handleFieldChange('description', e.target.value)}
         />
 
         {/* Duration */}
         <input
           type="number"
-          value={selectedBoard.duration ?? ""}
-          onChange={(e) => {
-            const updated = { ...selectedBoard, duration: e.target.value }; 
-            setSelectedBoard(updated); 
-            debouncedSave(updated);    
-          }}
+          value={displayBoard.duration ?? ""}
+          onChange={(e) => handleFieldChange('duration', e.target.value)}
         />
 
         {/* Transition */}
         <select
-          value={selectedBoard.transition ?? ""}
-          onChange={(e) => {
-            const updated = { ...selectedBoard, transition: e.target.value }; 
-            setSelectedBoard(updated); 
-            debouncedSave(updated);    
-          }}
+          value={displayBoard.transition ?? ""}
+          onChange={(e) => handleFieldChange('transition', e.target.value)}
         >
           <option value="">Select Transition</option>
           <option value="cut">Cut</option>
@@ -157,12 +232,8 @@ async function debouncedSave(updatedBoard) {
 
         {/* Aspect Ratio */}
         <select
-          value={selectedBoard.aspect_ratio ?? ""}
-          onChange={(e) => {
-            const updated = { ...selectedBoard, aspect_ratio: e.target.value }; 
-            setSelectedBoard(updated); 
-            debouncedSave(updated);    
-          }}
+          value={displayBoard.aspect_ratio ?? ""}
+          onChange={(e) => handleFieldChange('aspect_ratio', e.target.value)}
         >
           <option value="">Aspect Ratio</option>
           <option value="16:9">16:9</option>
@@ -172,12 +243,8 @@ async function debouncedSave(updatedBoard) {
 
         {/* Camera Angle */}
         <select
-          value={selectedBoard.camera_angle ?? ""}
-          onChange={(e) => {
-            const updated = { ...selectedBoard, camera_angle: e.target.value }; 
-            setSelectedBoard(updated); 
-            debouncedSave(updated);    
-          }}
+          value={displayBoard.camera_angle ?? ""}
+          onChange={(e) => handleFieldChange('camera_angle', e.target.value)}
         >
           <option value="">Camera Angle</option>
           <option value="eye-level">Eye-level</option>
@@ -188,12 +255,8 @@ async function debouncedSave(updatedBoard) {
 
         {/* Camera Movement */}
         <select
-          value={selectedBoard.camera_movement ?? ""}
-          onChange={(e) => {
-            const updated = { ...selectedBoard, camera_movement: e.target.value }; 
-            setSelectedBoard(updated); 
-            debouncedSave(updated);    
-          }}
+          value={displayBoard.camera_movement ?? ""}
+          onChange={(e) => handleFieldChange('camera_movement', e.target.value)}
         >
           <option value="">Camera Movement</option>
           <option value="static">Static</option>
@@ -205,12 +268,8 @@ async function debouncedSave(updatedBoard) {
 
         {/* Lens */}
         <select
-          value={selectedBoard.lens_focal_mm ?? ""}
-          onChange={(e) => {
-            const updated = { ...selectedBoard, lens_focal_mm: e.target.value }; 
-            setSelectedBoard(updated); 
-            debouncedSave(updated);    
-          }}
+          value={displayBoard.lens_focal_mm ?? ""}
+          onChange={(e) => handleFieldChange('lens_focal_mm', e.target.value)}
         >
           <option value="">Lens (mm)</option>
           <option value="18mm">18mm</option>
@@ -220,7 +279,6 @@ async function debouncedSave(updatedBoard) {
           <option value="135mm">135mm</option>
         </select>
 
-        {/* Actions */}
         <button onClick={handleSubmit}>Submit</button>
         <button className={styles.close_modal} onClick={onClose}>
           Close
