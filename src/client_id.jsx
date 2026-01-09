@@ -1,7 +1,4 @@
-//Creates a random ID that is saved to local storage 
-//This is needed for the locking functionality
-
-//Local Storage is scoped to the browser
+//Random ID creation (needed for indentifying clients for clocking mechanism)
 export function getClientID() {
   let id = localStorage.getItem('client_id');
   if (!id) {

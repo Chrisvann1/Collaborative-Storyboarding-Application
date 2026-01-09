@@ -1,0 +1,33 @@
+/*
+ * ========== LOGIN BUTTON ===============
+ *
+ * Defines the appearance and interaction
+ * for a large call-to-action button.
+ *
+ * - Uses the interactive accent color for emphasis
+ * - Large padding and font size for visibility
+ * - Rounded corners
+ * - Hover state provides visual feedback
+ */
+
+.button {
+  background-color: var(--accent-interactive);
+  color: white;
+  padding: 30px 50px; 
+  border-radius: 15px;    
+  border: none;
+  cursor: pointer;
+  font-weight: 600;       
+  font-size: 30px;        
+  transition: all 0.2s ease;
+}
+
+/*
+ * Hover State
+ * - Slight upward movement when hovered
+ * - Darker accent color to indicate interactivity
+ */
+.button:hover {
+  background-color: var(--accent-interactive-hover);
+  transform: translateY(-2px);
+}

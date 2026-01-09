@@ -1,8 +1,19 @@
-import styles from './CreateProjectButton.module.css'
+import styles from './styles/Button.module.css'
 
 
-//These parameters are props - if you go to EditProject.jsx, this is where the actual values 
-//are passed in. "Click Here" is a default value if there is not a message passed in
+/*==================== Project Button Component ==================== */
+/**
+ * ProjectButton Component
+ *
+ * A reusable button component for triggering actions related to projects (Only used for creating buttons in this case).
+ *
+ * Props:
+ * - onClick  : Function to execute when the button is clicked.
+ * - message  : Button label. Defaults to "Click Here" if not provided.
+ *
+ * Styling:
+ * - Uses CSS classes from 'CreateProjectButton.module.css' for consistent styling.
+ */
 export default function ProjectButton({ onClick, message = "Click Here" }) {
   return (
     <button onClick={onClick} className={`${styles.button} ${styles.addProject}`}>

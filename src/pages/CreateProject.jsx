@@ -4,10 +4,12 @@ import { useEffect } from 'react';
 import ProjectButton from "../components/CreateProjectButton.jsx"
 import ProjectModal from "../components/CreateProjectModal.jsx"
 import EditProjectModal from "../components/EditProjectModal.jsx"
+import DeleteProjectModal from "../components/DeleteProjectModal.jsx";
 import { useNavigate } from "react-router-dom";
 import { acquireProjectEditLock, 
          releaseProjectEditLock, 
          safeDeleteProject } from "../lock_handling.jsx";
+import { getClientID } from "../client_id.jsx";
 
 
 
@@ -25,6 +27,9 @@ export default function CreateProject() {
 
   //Stateful variable for whether update modal is open or closed
   const[updateModalOpen, setUpdateModalOpen] = useState(false); 
+
+  // NEW: State for delete confirmation modal
+  const[deleteModalOpen, setDeleteModalOpen] = useState(false);
 
   //For viewing available projects
   const [projects, setProjects] = useState([]);
@@ -109,6 +114,41 @@ export default function CreateProject() {
     }
   }, []);
 
+  // NEW: Monitor project edit lock when modal is open
+  useEffect(() => {
+    if (!updateModalOpen || !lockedProjectId) return;
+
+    const checkEditLock = async () => {
+      const clientId = getClientID();
+      
+      // Check if we still have the project edit lock
+      const { data: lock, error } = await supabase
+        .from('board_resource_locks')
+        .select('*')
+        .eq('resource_type', 'project_edit')
+        .eq('resource_id', lockedProjectId)
+        .eq('locked_by', clientId)
+        .maybeSingle();
+
+      // If lock doesn't exist or has expired
+      if (error || !lock) {
+        console.log('Project edit lock lost, closing modal');
+        setUpdateModalOpen(false);
+        setLockedProjectId(null);
+        setSelectedProject(null);
+        alert('Someone else is now editing this project.');
+      }
+    };
+
+    // Check lock every 2 seconds
+    const lockCheckInterval = setInterval(checkEditLock, 2000);
+    
+    // Initial check
+    checkEditLock();
+
+    return () => clearInterval(lockCheckInterval);
+  }, [updateModalOpen, lockedProjectId]);
+
   const fetchProjects = async () => {
       const {error, data} = await supabase 
           .from("projects")
@@ -160,86 +200,146 @@ const handleDeleteProject = async (id) => {
 
 
 
-    return (
-    <>    
-    
-    <ProjectButton
-        onClick={() => setModalOpen(true)}
-        message = "Create Project"
-    >Create Project 
-    </ProjectButton>
-
-    <ProjectModal
-        message = "Create Project"
-        open = {modalOpen}
-        onClose={() => setModalOpen(false)}
-        newProject = {newProject}
-        setNewProject = {setNewProject}
-        onSubmit={handleAddProject}
-    />
-
-    <EditProjectModal
-      message = "Edit Project"
-      open = {updateModalOpen}
-      onClose={async () => {
-        // release lock
-        if (lockedProjectId) {
-          await releaseProjectEditLock(lockedProjectId);
-          setLockedProjectId(null);
-        }
-        setUpdateModalOpen(false);
-        setSelectedProject(null);
-      }}
-      updateProject = {selectedProject}
-      setUpdatedProject = {setSelectedProject}
-      onSubmit={async (id, updatedFields) => {
-        await handleUpdateProject(id, updatedFields);
-        setUpdateModalOpen(false);
-        setSelectedProject(null);
-      }}
-      onAutoSave={async (updatedFields) => {
-        await handleUpdateProject(selectedProject.id, updatedFields); // save but do NOT close
-      }}
-    />
-
-    
-{/* Projects container */}
-  <div className="projects_container">
-        {projects.map((project) => (
-          <div
-            key={project.id} 
-            className="project_card"
-            onClick={() => navigate(`/projects/${project.id}`)}
-          >
-            <h3>{project.title}</h3>
-            <p>{project.description}</p>
-            <div className="project_actions">
-            <button onClick={async (e) => { 
-              e.stopPropagation();
-              const ok = await acquireProjectEditLock(project.id);
-              if (!ok) {
-                alert('This project is currently being edited by someone else.');
-                return;
-              }
-              setSelectedProject(project); 
-              setLockedProjectId(project.id);
-              setUpdateModalOpen(true); 
-            }}>Edit</button>
-
-              <button onClick={async (e) => { 
-                e.stopPropagation();
-                try {
-                  await handleDeleteProject(project.id);
-                } catch (error) {
-                  alert(error.message);
-                }
-              }}>Delete</button>
-            </div>
+  return (
+    <>
+      {/* Header Section */}
+      <header className="projects_page_header">
+        <div className="header_content">
+          <h1 className="app_title">Shot Sync</h1>
+          <div className="header_actions">
+            <ProjectButton
+              onClick={() => setModalOpen(true)}
+              message="+ Create New Project"
+            >
+              <span className="plus_sign">+</span> Create Project
+            </ProjectButton>
           </div>
-        ))}
-      </div>
+        </div>
+        <div className="header_subtitle">
+          <p>Create and manage your storyboard projects</p>
+        </div>
+      </header>
+
+      {/* Main Content Area */}
+      <main className="projects_main_content">
+        {/* Create Project Modal*/}
+        <ProjectModal
+          message="Create Project"
+          open={modalOpen}
+          onClose={() => setModalOpen(false)}
+          newProject={newProject}
+          setNewProject={setNewProject}
+          onSubmit={handleAddProject}
+        />
+
+        <EditProjectModal
+          message="Edit Project"
+          open={updateModalOpen}
+          onClose={async () => {
+            if (lockedProjectId) {
+              await releaseProjectEditLock(lockedProjectId);
+              setLockedProjectId(null);
+            }
+            setUpdateModalOpen(false);
+            setSelectedProject(null);
+          }}
+          updateProject={selectedProject}
+          setUpdatedProject={setSelectedProject}
+          onSubmit={async (id, updatedFields) => {
+            await handleUpdateProject(id, updatedFields);
+            setUpdateModalOpen(false);
+            setSelectedProject(null);
+          }}
+          onAutoSave={async (updatedFields) => {
+            await handleUpdateProject(selectedProject.id, updatedFields);
+          }}
+        />
+
+        <DeleteProjectModal
+          open={deleteModalOpen}
+          projectTitle={selectedProject?.title || ""}
+          onCancel={() => {
+            setDeleteModalOpen(false);
+            setSelectedProject(null);
+          }}
+          onConfirm={async () => {
+            try {
+              await handleDeleteProject(selectedProject.id);
+              setDeleteModalOpen(false);
+              setSelectedProject(null);
+            } catch (error) {
+              alert(error.message);
+              setDeleteModalOpen(false);
+              setSelectedProject(null);
+            }
+          }}
+        />
+
+        {/* Projects Grid Section */}
+        <section className="projects_section">
+          <h2 className="section_title">Your Projects</h2>
+          {projects.length === 0 ? (
+            <div className="empty_state">
+              <h3>No projects yet</h3>
+              <p>Create your first project to get started</p>
+              <ProjectButton
+                onClick={() => setModalOpen(true)}
+                message="+ Create First Project"
+              >
+                Create First Project
+              </ProjectButton>
+            </div>
+          ) : (
+            <div className="projects_grid">
+              {projects.map((project) => (
+                <div
+                  key={project.id}
+                  className="project_card"
+                  onClick={() => navigate(`/projects/${project.id}`)}
+                >
+                  <div className="project_card_content">
+                    <h3>{project.title}</h3>
+                    <p>{project.description || "No description"}</p>
+                    <div className="project_card_footer">
+                      <span className="project_date">
+                        Updated: {new Date(project.updated_at).toLocaleDateString()}
+                      </span>
+                      <div className="project_actions">
+                        <button 
+                          onClick={async (e) => { 
+                            e.stopPropagation();
+                            const ok = await acquireProjectEditLock(project.id);
+                            if (!ok) {
+                              alert('This project is currently being edited by someone else.');
+                              return;
+                            }
+                            setSelectedProject(project); 
+                            setLockedProjectId(project.id);
+                            setUpdateModalOpen(true); 
+                          }}
+                          className="edit_button"
+                        >
+                          Edit
+                        </button>
+                        <button 
+                          onClick={async (e) => { 
+                            e.stopPropagation();
+                            setSelectedProject(project);
+                            setDeleteModalOpen(true);
+                          }}
+                          className="delete_button"
+                        >
+                          Delete
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </section>
+      </main>
     </>
   );
-
-
 }

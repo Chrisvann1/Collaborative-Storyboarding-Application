@@ -17,41 +17,45 @@
 //
 
 
-
+import  placeholder_image from "../assets/placeholder.jpeg";
 import { useState } from "react";
-//Everytime something happens -> Do whatever 
+//Everytime something happens -> have an effect to that action
 import { useEffect } from 'react';
-import { DndContext } from "@dnd-kit/core";
+import { DndContext, closestCenter } from "@dnd-kit/core";
 import { SortableContext, useSortable, arrayMove } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
-import Board from "../components/Boards.jsx";
-import GeneralButton from "../components/GeneralButton.jsx"
+import Board from "../components/Boards.jsx"
+import GeneralButton from "../components/BoardButton.jsx"
 import Modal from "../components/AddModal.jsx"
 import EditModal from "../components/EditModal.jsx"
 import { supabase } from "../supabase-client.js"
 //Allows me to take the :id part of the url and use this info
-import { useParams, useLocation } from "react-router-dom";
-import playButton from "../assets/play_button.png"
-import stopButton from "../assets/stop_button.png"
+import { useParams } from "react-router-dom";
+import { PlayButton } from "../assets/PlayButton.jsx";
+import { StopButton } from "../assets/StopButton.jsx";
 import { useNavigate } from "react-router-dom";
 import { acquireLock } from "../lock_handling.jsx";
 import { releaseLock } from "../lock_handling.jsx";
+import { acquireDragLock, releaseDragLock } from "../lock_handling.jsx";
 import { safeDeleteBoard } from "../lock_handling.jsx";
+import  DeleteBoardModal  from "../components/DeleteBoardModal.jsx";
 import { acquireProjectSessionLock,
          refreshProjectSessionLock, 
          releaseProjectSessionLock } from "../lock_handling.jsx";
+import { getClientID } from "../client_id.jsx";
+
 
 
 
 function SortableBoard(props) {
   const { id, board, onDoubleClick } = props;
-  const { setNodeRef, listeners, attributes, transform, transition } =
+  const { setNodeRef, listeners, attributes, transform, transition, isDragging } =
     useSortable({ id });
 
   const style = {
     transform: CSS.Transform.toString(transform),
     transition,
-    cursor: "grab",
+    cursor: isDragging ? "grabbing" : "grab",
   };
 
   return (
@@ -60,7 +64,12 @@ function SortableBoard(props) {
       style={style}
       {...listeners}
       {...attributes}
-      onDoubleClick={onDoubleClick}
+      data-id={id}
+      onDoubleClick={(e) => {
+        e.stopPropagation();
+        e.preventDefault();
+        onDoubleClick();
+      }}
     >
       <Board {...board} />
     </div>
@@ -69,139 +78,57 @@ function SortableBoard(props) {
 
 
 
-//I need to figure out how the dnd-kit works
-//I also need to figure out the useState and how that is being used for the modal
 export default function EditProject() {
 
-
-
-  //Returns an object with keys for each dynamic URL segment 
-  //So in the case of /projects/5 - 5 would be returned
   const { id } = useParams();
+  const navigate = useNavigate();
 
-
-  //State variable - a small amount of memory that React keeps between renders 
-      //For this example - if I switched these boards around they would remain switched when the 
-      //website is rendered
-  //newBoard - current value 
-  //setNewBoard - The function you are calling to change this current value
-  //setNewBoards is updating these values
-  //For making a new board
-
-  //Add scene info back later if there is enough time
   const [newBoard, setNewBoard] = useState({title: "", shot: null, description: "", duration: null, transition: "", aspect_ratio: "", camera_angle: "", camera_movement: "", lens_focal_mm: ""})
-
-
-  //For reading/viewing notes
   const [boards, setBoards] = useState([]);
-
-  //I need this for clicking on a board to get information about it
   const [selectedBoard, setSelectedBoard] = useState(null);
+  const [deleteModalOpen, setDeleteModalOpen] = useState(false);
 
-
-  //Used for setting the information in the left container
-  const [infoBoards, setInfoBoards] = useState([]);
-
-  //Opening and closing the Modal
-  //Sets ModelOpen to false initially
-  //ModelsetOpen - setter function to change the value of Modalopen
-  //This is for the add board modal
   const [Modalopen, ModalsetOpen] = useState(false);
-
-
-  //This is for the edit baord modal
   const [editModalOpen, setEditModalOpen] = useState(false);
-
-
-  //Cascasding and recursive renumbering to deal with conflicts
-async function handleShotConflicts(projectID, newShot, ignoreID = null) {
   
-  // Get ALL boards in the project ordered by shot
-  const { data: allBoards, error } = await supabase 
-    .from("boards")
-    .select("id, shot")
-    .eq("project_id", projectID)
-    .order("shot", { ascending: true });
-
-  if (error) {
-    return;
-  }
-
-
-  const exactConflict = allBoards.find(board => 
-    board.shot === newShot && (!ignoreID || board.id !== ignoreID)
-  );
-
-  if (!exactConflict) {
-    return;
-  }
-
-
-  // Find all boards that need to be shifted (only if they form a continuous sequence)
-  // Start from the conflict shot and find all consecutive boards
-  let currentShot = newShot;
-  const boardsToShift = [];
+  // Add state for project title
+  const [projectTitle, setProjectTitle] = useState("");
   
-  while (true) {
-    const boardAtCurrentShot = allBoards.find(board => board.shot === currentShot);
-    if (boardAtCurrentShot && (!ignoreID || boardAtCurrentShot.id !== ignoreID)) {
-      boardsToShift.push(boardAtCurrentShot);
-      currentShot++;
-    }
-    else {
-      break;
-    }
-  }
-
-
-  // Shift boards in reverse order to avoid temporary conflicts
-  for (let i = boardsToShift.length - 1; i >= 0; i--) {
-    const board = boardsToShift[i];
-    const newShotValue = board.shot + 1;
-    
-    const { error: updateError } = await supabase 
-      .from("boards")
-      .update({ shot: newShotValue })
-      .eq("id", board.id);
-
-    if (updateError) {
-      return;
-    }
-  }
-
-}
+  // Animatic functionality states
+  const [isPlaying, setIsPlaying] = useState(false);
+  const [currentAnimaticBoardIndex, setCurrentAnimaticBoardIndex] = useState(0);
+  const [animaticIntervalId, setAnimaticIntervalId] = useState(null);
+  
 
 
 
 const handleAddBoard = async (e) => {
   e.preventDefault();
 
-  //Handles shot number conflicts for boards
-  const shotNumber = Number(newBoard.shot); 
+  const duration = newBoard.duration === "" ? null : Number(newBoard.duration);
+  const lens_focal_mm = newBoard.lens_focal_mm === "" ? null : Number(newBoard.lens_focal_mm.replace("mm",""));
 
-  await handleShotConflicts(id, shotNumber); 
+  const { error } = await supabase.rpc('add_board', {
+    p_project_id: Number(id),
+    p_title: newBoard.title,
+    p_description: newBoard.description,
+    p_duration: duration,
+    p_transition: newBoard.transition,
+    p_aspect_ratio: newBoard.aspect_ratio,
+    p_camera_angle: newBoard.camera_angle,
+    p_camera_movement: newBoard.camera_movement,
+    p_lens_focal_mm: lens_focal_mm,
+    p_image_url: newBoard.image_url || null,
+  });
 
-  const { error } = await supabase.from("boards").insert([{
-    //Copies all properties of new board
-    //If scene, shot, duration, and lens_focal_mm are an empty string, 
-    //Then store null in its place
-    ...newBoard,
-    project_id: id,
-    //Add this line back later if you have time for scene implementation
-    //scene: newBoard.scene === "" ? null : Number(newBoard.scene),
-    shot: newBoard.shot === "" ? null : Number(newBoard.shot),
-    duration: newBoard.duration === "" ? null : Number(newBoard.duration),
-    lens_focal_mm: newBoard.lens_focal_mm === "" ? null : Number(newBoard.lens_focal_mm.replace("mm", "")),
-  }]);
-    if (error) {
-      console.error("Error adding board: ", error.message);
-      return;
-    }
+  if (error) {
+    console.error("Error adding board:", error.message);
+    return;
+  }
 
-    //Add the scene back later if there is time 
-    setNewBoard({
+  // Reset form & update frontend
+  setNewBoard({
     title: "",
-    //scene: "",
     shot: "",
     description: "",
     duration: "",
@@ -210,70 +137,169 @@ const handleAddBoard = async (e) => {
     camera_angle: "",
     camera_movement: "",
     lens_focal_mm: "",
-    });
+  });
 
-    fetchBoards();
-    fetchInfo();
-    ModalsetOpen(false);
-    
-  };
+  fetchBoards();
+  fetchInfo();
+  ModalsetOpen(false);
+};
 
-//Triggers after first render, when there is different URL, and if a user leaves
-//Aquires the project session lock so the project can't be deleted
+
 useEffect(() => {
   if (!id) return;
    
   const projectId = parseInt(id);
   
-  //Acquire a project session lock for this specific project 
-
   acquireProjectSessionLock(projectId);
   
-  //This function will be called whenever the user does something in the project
-  //moving their mouse for example
   const refreshLock = () => {
     refreshProjectSessionLock(projectId);
   };
 
-  //Events to tell if a user is still using the complication
   const events = ['mousemove', 'keypress', 'click', 'scroll'];
   
-  //For each of those user actions, set up a listener that calls our refreshLock function
   events.forEach(event => {
     document.addEventListener(event, refreshLock);
   });
 
-  //Runs when the user leaves the project (when a component unmounts)
   return () => {
-    //Removes all event listeners previously set up
     events.forEach(event => {
       document.removeEventListener(event, refreshLock);
     });
     
-    //Releases the lock
     releaseProjectSessionLock(projectId);
   };
-  //project ID
 }, [id]); 
 
-//Runs the fetchBoards function after the first rende So that the boards and data show up 
-//Empty array means to only run once after the initial render
-//The argument controls when the effect runs ( [] )
-//Exp: 
+// Fetch project title when component mounts
+const fetchProjectTitle = async () => {
+  if (!id) return;
+  
+  try {
+    const { error, data } = await supabase
+      .from("projects")
+      .select("title")
+      .eq("id", id)
+      .single();
+
+    if (error) {
+      console.error("Error fetching project title:", error.message);
+      return;
+    }
+
+    if (data && data.title) {
+      setProjectTitle(data.title);
+    }
+  } catch (err) {
+    console.error("Error in fetchProjectTitle:", err);
+  }
+};
+
+//Monitor project deletion and session lock
+useEffect(() => {
+  if (!id) return;
+  
+  const projectId = parseInt(id);
+  
+  // Check if project still exists
+  const checkProjectExists = async () => {
+    const { data: project, error } = await supabase
+      .from('projects')
+      .select('id')
+      .eq('id', projectId)
+      .single();
+
+    if (error || !project) {
+      console.log('Project no longer exists, navigating away');
+      alert('This project has been deleted.');
+      navigate('/CreateProject');
+      return false;
+    }
+    return true;
+  };
+
+  // Check project session lock
+  const checkSessionLock = async () => {
+    const clientId = getClientID();
+    
+    const { data: lock, error } = await supabase
+      .from('not_exclusive_resource_locks')
+      .select('*')
+      .eq('resource_type', 'project_session')
+      .eq('resource_id', projectId)
+      .eq('locked_by', clientId)
+      .gt('expires_at', new Date().toISOString())
+      .maybeSingle();
+
+    if (error || !lock) {
+      console.log('Session lock lost, project may be deleted or session expired');
+      // Check project existence one more time
+      await checkProjectExists();
+    }
+  };
+
+  // Check every 3 seconds
+  const projectCheckInterval = setInterval(async () => {
+    await checkProjectExists();
+    await checkSessionLock();
+  }, 3000);
+
+  // Initial check
+  checkProjectExists();
+
+  return () => {
+    clearInterval(projectCheckInterval);
+  };
+}, [id, navigate]);
+
 useEffect(() => {
   fetchBoards();
   fetchInfo(); 
+  fetchProjectTitle();
 }, []);
 
+// Monitor board edit lock when modal is open
+useEffect(() => {
+  if (!editModalOpen || !selectedBoard) return;
 
-//Update frontend for all clients if any client makes a change to the boards table
+  const checkBoardLock = async () => {
+    const clientId = getClientID();
+    
+    // Check if board lock still exists
+    const { data: lock, error } = await supabase
+      .from('board_resource_locks')
+      .select('*')
+      .eq('resource_type', 'board')
+      .eq('resource_id', selectedBoard.id)
+      .eq('locked_by', clientId)
+      .maybeSingle();
+
+    // If lock doesn't exist or has expired
+    if (error || !lock) {
+      console.log('Board edit lock lost, closing modal');
+      setEditModalOpen(false);
+      setSelectedBoard(null);
+      alert('Someone else is now editing this board.');
+      return false;
+    }
+    return true;
+  };
+
+  // Set up interval to check lock
+  const lockCheckInterval = setInterval(checkBoardLock, 2000);
+
+  // Also check on initial modal open
+  checkBoardLock();
+
+  return () => clearInterval(lockCheckInterval);
+}, [editModalOpen, selectedBoard]);
+
 useEffect(() => {
   if (!id) return; 
   
   const channel = supabase 
   .channel(`project-${id}-boards`)
   
-  // Listen for INSERT events - when new boards are added
   .on(
     'postgres_changes', 
     {
@@ -289,7 +315,6 @@ useEffect(() => {
     }
   )
   
-  // Listen for UPDATE events - when boards are modified
 .on(
   'postgres_changes', 
   {
@@ -301,12 +326,9 @@ useEffect(() => {
   (payload) => {
     console.log('Board UPDATE:', payload);
 
-    // FIXED: Always update the boards list so other users see changes
-    // But don't update the selectedBoard if it's currently being edited
     fetchBoards(); 
     fetchInfo();
 
-    // Update selectedBoard only if it's NOT currently being edited in the modal
     setSelectedBoard((prev) => {
       if (prev && prev.id === payload.new.id && !editModalOpen) {
         return { ...prev, ...payload.new };
@@ -315,28 +337,53 @@ useEffect(() => {
     });
   }
 )
+
+.on(
+  'postgres_changes',
+  {
+    event: 'UPDATE',
+    schema: 'public',
+    table: 'projects',
+    filter: `id=eq.${id}`
+  },
+  (payload) => {
+    console.log('Project UPDATE detected:', payload);
+    if (payload.new.title) {
+      setProjectTitle(payload.new.title);
+    }
+  }
+)
   
-  // Listen for DELETE events - when boards are removed
-  .on(
-    'postgres_changes', 
-    {
-      event: 'DELETE', 
-      schema: 'public', 
-      table: 'boards'
-    },
-    (payload) => {
-      console.log('Board DELETE detected:', payload)
+.on(
+  'postgres_changes', 
+  {
+    event: 'DELETE', 
+    schema: 'public', 
+    table: 'boards'
+  },
+  (payload) => {
+    console.log('Board DELETE detected:', payload)
+    
+    // Check if the deleted board is currently selected or being edited
+    if (selectedBoard && selectedBoard.id === payload.old.id) {
+      // Clear the selected board if it was deleted
+      setSelectedBoard(null);
       
-      // If the deleted board is the one being edited, close the modal
-      if (editModalOpen && selectedBoard && selectedBoard.id === payload.old.id) {
+      // Also close the edit modal if it's open
+      if (editModalOpen) {
         setEditModalOpen(false);
-        setSelectedBoard(null);
       }
       
-      fetchBoards(); 
-      fetchInfo();
+      // If animatic was playing and this was the current board, stop it
+      if (isPlaying) {
+        stopAnimatic();
+      }
     }
-  )
+    
+    fetchBoards(); 
+    fetchInfo();
+  }
+)
   .subscribe(); 
 
   return () => {
@@ -344,19 +391,20 @@ useEffect(() => {
   }
 }, [id, editModalOpen, selectedBoard]);
 
+// Clean up animatic interval on component unmount
+useEffect(() => {
+  return () => {
+    if (animaticIntervalId) {
+      clearInterval(animaticIntervalId);
+    }
+  };
+}, [animaticIntervalId]);
 
-
-//Used to get the board info from the database and 
-//sort by Scene-Shot order
 const fetchBoards = async () => {
   const {error, data} = await supabase 
     .from("boards")
     .select("*")
-    //Makes sure the project id in the table matches 
-    //that found from the URL (only these boards will be shown)
     .eq("project_id", id)
-    //For now, get rid of the scenes. Add this later if you have time to add scene functionality
-    //.order("scene", { ascending: true })
     .order("shot", { ascending: true });
 
     if (error) {
@@ -367,7 +415,6 @@ const fetchBoards = async () => {
     setBoards(data);
 }
 
-//Information for the left container for each of the boards
 const fetchInfo = async () => {
 
   const {error, data} = await supabase
@@ -381,49 +428,24 @@ const fetchInfo = async () => {
       return; 
     }
 
-    setInfoBoards(data); 
 }
 
-//Allows a user to update an existing board
 const updateBoard = async (boardId, updatedFields) => {
-  
   try {
-    // Handle shot conflicts only if shot is being updated
-    if (updatedFields.shot !== undefined) {
-      const { data: currentBoard, error: fetchError } = await supabase
-        .from("boards")
-        .select("shot")
-        .eq("id", boardId)
-        .single();
-
-      if (!fetchError) {
-        const currentShot = Number(currentBoard.shot);
-        const newShot = Number(updatedFields.shot);
-
-        if (newShot !== currentShot) {
-          await handleShotConflicts(id, newShot, boardId); 
-        }
-      }
-    }
-
-    // update the database - real-time subscriptions will handle UI updates
-    const {error} = await supabase 
+    const { error } = await supabase
       .from("boards")
       .update(updatedFields)
       .eq("id", boardId);
 
     if (error) {
-      console.error("Error updating board", error.message);
-      return;
+      console.error("Error updating board:", error.message);
     }
-    
-  } catch (error) {
-    console.error("Error in updateBoard:", error.message);
-  }
-}
 
-//Updates the shot of a board whenever boards are shifted around
-//This needs to be better to deal with scenes 
+  } catch (err) {
+    console.error("Error in updateBoard:", err.message);
+  }
+};
+
 async function renumber(list) {
   for (let i = 0; i < list.length; i++) {
     const board = list[i];
@@ -439,47 +461,152 @@ async function renumber(list) {
   }
 }
 
-  function onDragEnd({ active, over }) {
-    if (!over || active.id === over.id) return;
-    setBoards((items) => {
-      const oldIndex = items.findIndex((i) => i.id === active.id);
-      const newIndex = items.findIndex((i) => i.id === over.id);
-      const reordered = arrayMove(items, oldIndex, newIndex);
-      renumber(reordered); // update indexes
-      setInfoBoards(reordered.map(({ id, title, shot }) => ({ id, title, shot })));
-      return reordered
+// ANIMATIC FUNCTIONS
+const startAnimatic = () => {
+  if (boards.length === 0) {
+    alert("No boards to play");
+    return;
+  }
+
+  // Stop any existing animatic
+  if (animaticIntervalId) {
+    clearInterval(animaticIntervalId);
+  }
+
+  // Determine starting index
+  let startIndex = 0;
+  if (selectedBoard) {
+    // Find the index of the currently selected board
+    const boardIndex = boards.findIndex(board => board.id === selectedBoard.id);
+    if (boardIndex !== -1) {
+      startIndex = boardIndex;
+    }
+  }
+
+  setCurrentAnimaticBoardIndex(startIndex);
+  setIsPlaying(true);
+
+  // Set the first board
+  setSelectedBoard(boards[startIndex]);
+
+  // Start the interval
+  const intervalId = setInterval(() => {
+    setCurrentAnimaticBoardIndex(prevIndex => {
+      const nextIndex = prevIndex + 1;
+      
+      // If we've reached the end, stop
+      if (nextIndex >= boards.length) {
+        clearInterval(intervalId);
+        setIsPlaying(false);
+        return prevIndex;
+      }
+      
+      // Update to the next board
+      setSelectedBoard(boards[nextIndex]);
+      return nextIndex;
     });
+  }, 2000); // 2 seconds per board
+
+  setAnimaticIntervalId(intervalId);
+};
+
+const stopAnimatic = () => {
+  if (animaticIntervalId) {
+    clearInterval(animaticIntervalId);
+    setAnimaticIntervalId(null);
+  }
+  setIsPlaying(false);
+  
+  // Keep the current selected board as is (paused state)
+};
+
+
+// Handle board double click (for sortable boards)
+const handleBoardDoubleClick = (board) => {
+  if (isPlaying) {
+    stopAnimatic();
+  }
+  setSelectedBoard(board);
+};
+
+
+async function onDragEnd({ active, over }) {
+  if (!over || active.id === over.id) {
+    return;
   }
 
-  //Used to get the title from the URL
-  const location = useLocation(); 
-  const title = location.pathname.split("/").pop()
+  // Try to acquire lock
+  try {
+    const gotLock = await acquireDragLock(id);
+    
+    if (!gotLock) {
+      alert("Another user is currently reordering boards. Please wait a moment and try again.");
+      
+      // Refresh boards to ensure consistency
+      fetchBoards();
+      return;
+    }
 
-  //For animatic play button
+    // Perform reordering
+    const oldIndex = boards.findIndex((i) => i.id === active.id);
+    const newIndex = boards.findIndex((i) => i.id === over.id);
+
+    // Validate indices
+    if (oldIndex === -1 || newIndex === -1) {
+      console.error("Invalid indices in drag operation");
+      fetchBoards();
+      return;
+    }
+
+    const reordered = arrayMove(boards, oldIndex, newIndex);
+
+    // Update local state (this triggers smooth animation via dnd-kit)
+    setBoards(reordered);
+
+    // Persist to database
+    await renumber(reordered);
+
+  } catch (err) {
+    console.error("Error during onDragEnd:", err);
+    fetchBoards();
+    fetchInfo();
+  } finally {
+    // Always try to release lock
+    try {
+      await releaseDragLock(id);
+    } catch (releaseErr) {
+      console.error("Error releasing drag lock:", releaseErr);
+    }
+  }
+}
+
   const handlePlayButtonClick = () => {
-    alert("Play image clicked");
+    if (isPlaying) {
+      stopAnimatic();
+    } else {
+      startAnimatic();
+    }
   }
 
-  //For animatic stop button
   const handleStopButtonClick = () => {
-    alert("Stop image clicked");
+    stopAnimatic();
   }
 
-  //Object to navigate between pages
-  //Used for project button
-  const navigate = useNavigate();
+  
   return (
     <>
     <div className="boards_container">
-      <DndContext onDragEnd={onDragEnd}>
+      <DndContext 
+        onDragEnd={onDragEnd} 
+        collisionDetection={closestCenter}
+      >
         <SortableContext items={boards.map((b) => b.id)}>
           {boards.map((b) => (
             <SortableBoard
               key={b.id}
               id={b.id}
               board={b}
-              //On double click - set SelectedBoard to the board that was double clicked
-              onDoubleClick={() => setSelectedBoard(b)}
+              onDoubleClick={() => handleBoardDoubleClick(b)}
             />
           ))}
         </SortableContext>
@@ -489,13 +616,14 @@ async function renumber(list) {
 <div className = "image_container"> 
     {selectedBoard ? (
       <img 
-        src = {selectedBoard.image_url}
+        src = {selectedBoard.image_url || placeholder_image}
           style={{
             display: 'flex',
             justifyContent: 'center',
             alignItems: 'center',    
             height: '100%',         
-            width: '100%'           
+            width: '100%',
+            objectFit: 'contain'
           }}
       />
     ) : null}
@@ -508,37 +636,20 @@ async function renumber(list) {
         onClick={() => navigate(`/CreateProject`)}
         >Back to Projects
       </GeneralButton>
-      <h2>Title: {decodeURIComponent(title)}</h2>
-      {/*
+      <h2>Title: {projectTitle || "Loading..."}</h2>
       <GeneralButton 
-        message = "Redo"
-        >Redo
-      </GeneralButton>
-      <GeneralButton 
-        message = "Undo"
-        >Undo
-      </GeneralButton>
-      <GeneralButton 
-        message = "Share"
-        > Share 
-      </GeneralButton>
-      */}
-      <GeneralButton 
-        message = "Export"
-        > Export
+          onClick={() => ModalsetOpen(true)}
+          message = "Add Board"
+          >Add Board
       </GeneralButton>
 
 
     </div>
     <div className="right_nav_container">
-    {/*If selected board is not null - put all information on the screen
-    else, put a placeholder message*/}
     {selectedBoard ? (
       <div className="board-info">
         <h2>Board Info</h2>
         <p><strong>Title:</strong> {selectedBoard.title}</p>
-        {/*Add scenes back later if time*/}
-        {/*<p><strong>Scene:</strong> {selectedBoard.scene}</p>*/}
         <p><strong>Shot:</strong> {selectedBoard.shot}</p>
         <p><strong>Description:</strong> {selectedBoard.description}</p>
         <p><strong>Duration:</strong> {selectedBoard.duration}</p>
@@ -562,76 +673,64 @@ async function renumber(list) {
       >
         Edit Board
       </GeneralButton>
-        <GeneralButton 
-          message="Delete Board" 
-          onClick={async () => {
-            try {
-            await safeDeleteBoard(selectedBoard.id);
-
-            setBoards(prev => prev.filter(b => b.id !== selectedBoard.id));
-            setInfoBoards(prev => prev.filter(b => b.id !== selectedBoard.id));
-            setSelectedBoard(null);
-          } 
-          catch (error) {
-            alert(error.message);
-          }
-          }}
->Delete Board</GeneralButton>
+      
+      {/* Delete Board button */}
+      <GeneralButton
+        message="Delete Board"
+        variant="delete"
+        onClick={() => {
+          console.log("Delete button clicked, setting deleteModalOpen to true");
+          setDeleteModalOpen(true);
+        }}
+      >
+        Delete Board
+      </GeneralButton>
       </div>
     ) : (
       <p className="board-placeholder">Click a board to see details</p>
-    )
-    }
+    )}
           
     </div>
-    {/*This is for the animatic feature at the bottom of the screen*/}
-    <div className = "animatic_container">
-      <img className = "play_button"
-        src={playButton}
-        onClick={handlePlayButtonClick}
-      />
+    
+<div className="animatic_container">
+  <div 
+    onClick={handlePlayButtonClick}
+    style={{ 
+      display: 'inline-block',
+      opacity: isPlaying ? 0.5 : 1, 
+      cursor: 'pointer',
+      margin: '15px'
+    }} 
+  >
+    <PlayButton className="play_button" />
+  </div>
 
-      <img className="stop_button"
-        src={stopButton}
-        onClick={handleStopButtonClick}
-      />
-      {/*Slider bar for animatic feature
-      Set to read only for now - but this can be changed once made interactive*/}
-      <input className="slider_bar" type="range" min="0" max="100" value="0" readOnly />
+  <div 
+    onClick={handleStopButtonClick}
+    style={{ 
+      display: 'inline-block',
+      opacity: isPlaying ? 1 : 0.5, 
+      cursor: 'pointer',
+      margin: '5px'
+    }}
+  >
+    <StopButton className="stop_button" />
+  </div>
+  
+  {isPlaying && (
+    <div style={{
+      marginLeft: '10px',
+      color: 'var(--accent-success)',
+      fontWeight: '600',
+      display: 'inline-block',
+    }}>
+      Playing... Board {currentAnimaticBoardIndex + 1} of {boards.length}
     </div>
+  )}
+</div>
+    
     <div className="left_nav_container">
-        {/*Clicking the button leads to ModalSetOpen function setting Modal open to true
-        onClick needs a function so React can call it later when the user clicks
-        The arrow is how you declare an inline function
-        It is essentially a function without a name that's only job is to set ModalsetOpen to true.
-        The parentheses before the function is the parameter list for it, we just don't need any arguments here*/}
-        <GeneralButton 
-          onClick={() => ModalsetOpen(true)}
-          message = "Add Board"
-          >Add Board
-        </GeneralButton>
 
-
-    {/*Used for listing the boards in the left container*/}
-    <div className="board_list">
-      {infoBoards.length > 0 ? (
-        infoBoards.map((b) => (
-          <div 
-            key={b.id} 
-            className="board_list_item"
-            onClick={() => setSelectedBoard(b)}
-          >
-            <strong>Shot {b.shot}:</strong> {b.title}
-          </div>
-        ))
-      ) : (
-        <p>No boards yet</p>
-      )}
-    </div>
-
-
-
-        {/* Pass the BOOLEAN state to `open`, not the setter */}
         <Modal
           message = "Add Board"
           open={Modalopen}
@@ -639,6 +738,7 @@ async function renumber(list) {
           newBoard={newBoard}
           setNewBoard={setNewBoard}
           onSubmit={handleAddBoard}
+          boards={boards}
         />
         <EditModal
           message="Edit Board"
@@ -649,17 +749,42 @@ async function renumber(list) {
           }}
           selectedBoard={selectedBoard}
           setSelectedBoard={setSelectedBoard}
-          // ONLY called on actual Submit click
           onSubmit={async (boardId, updatedFields) => {
-            await updateBoard(boardId, updatedFields); // save changes
-            setEditModalOpen(false);                   // close modal
+            await updateBoard(boardId, updatedFields);
+            setEditModalOpen(false);
           }}
-          // separate save function for typing (does not close modal)
           onAutoSave={async (updatedFields) => {
             await updateBoard(selectedBoard.id, updatedFields);
           }}
         />
       </div>
+
+  {/* Delete Confirmation Modal - MUST be at the end to appear on top */}
+  <DeleteBoardModal
+    open={deleteModalOpen}
+    onCancel={() => {
+      console.log("Delete modal cancelled");
+      setDeleteModalOpen(false);
+    }}
+    onConfirm={async () => {
+      console.log("Delete modal confirmed");
+      try {
+        await safeDeleteBoard(selectedBoard.id);
+        
+        setBoards(prev => prev.filter(b => b.id !== selectedBoard.id));
+        setSelectedBoard(null);
+        setDeleteModalOpen(false);
+        
+        // If animatic was playing, stop it
+        if (isPlaying) {
+          stopAnimatic();
+        }
+      } catch (error) {
+        alert(error.message);
+        setDeleteModalOpen(false);
+      }
+    }}
+  />
 
 
   </>

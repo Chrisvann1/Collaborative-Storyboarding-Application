@@ -1,0 +1,99 @@
+/*================================================================================================================================================================*/
+/* ==================== Board Component Styles ==================== */
+/*================================================================================================================================================================*/
+
+/* 
+ * Board Container
+ *
+ * .board
+ * - Represents the card/container for a single storyboard shot.
+ * - Displays border, shadow, padding, and background color.
+ * - Fixed width and height for consistent layout.
+ * - Cursor changes to pointer and smooth hover transition effects.
+ */
+.board {
+  border: 1px solid var(--border-primary);
+  border-radius: 8px;
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.2);
+  padding: 10px;
+  margin: 4px;
+  text-align: left;
+  width: 115px;
+  height: 100px;
+  display: inline-block;
+  background-color: var(--bg-surface);
+  transition: all 0.3s ease;
+  cursor: pointer;
+}
+
+/* Hover Effect */
+.board:hover {
+  border-color: var(--accent-interactive);
+  box-shadow: 0 8px 12px rgba(0, 0, 0, 0.3);
+  transform: translateY(-2px);
+}
+
+/* 
+ * Image Container
+ *
+ * .image_container
+ * - Circular container for the shot image or placeholder.
+ * - Centers content with flexbox.
+ * - Clips overflow to maintain circular shape.
+ */
+.image_container {
+  width: 60px;
+  height: 60px;
+  margin: 0 auto 8px auto;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  overflow: hidden;
+  border-radius: 50%;
+}
+
+/* 
+ * Image Placeholder
+ *
+ * .image_placeholder
+ * - Shown when no image is available.
+ * - Circular with border and background color.
+ */
+.image_placeholder {
+  width: 100%;
+  height: 100%;
+  background-color: var(--bg-surface-light);
+  border: 1px solid var(--border-secondary);
+  border-radius: 50%;
+}
+
+/* 
+ * Board Image
+ *
+ * .board_image
+ * - Ensures the uploaded image fills the circular container.
+ */
+.board_image {
+  width: 100%;
+  height: 100%;
+}
+
+
+/* 
+ * Board Title
+ *
+ * .board_title
+ * - Displays the shot title under the image.
+ * - Centered text, bold font, ellipsis for overflow.
+ */
+.board_title {
+  font-family: sans-serif;
+  color: var(--text-primary);
+  font-weight: 600;
+  font-size: 14px;
+  margin: 4px 0;
+  text-align: center;
+  line-height: 1.2;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}

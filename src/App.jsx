@@ -4,7 +4,10 @@ import Login from './pages/Login.jsx'
 import CreateProject from './pages/CreateProject.jsx'
 
 
-
+// APP-LEVEL ROUTING CONFIGURATION
+// - Login Page: "/"
+// - Edit Project Page: "/projects/:id"
+// - Create Project Page: "/CreateProject"
 export default function App() {
   return (
     <div>

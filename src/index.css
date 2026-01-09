@@ -1,17 +1,55 @@
+
+/*================================================================================================================================================================*/
+/* ==================== Color Scheme and Background ==================== */
+/*================================================================================================================================================================*/
+
+:root {
+  /* Backgrounds */
+  --bg-canvas: #0A0A0A;
+  --bg-surface: #151522;         
+  --bg-secondary-surface: #1D1B2E;
+  --bg-surface-elevated: #222136; 
+  --bg-surface-light: #2D2B55;
+  
+  /* Text */
+  --text-primary: #E5E7EB;
+  --text-secondary: #9CA3AF;
+  --text-disabled: #6B7280;
+  --text-header: #E5E7EB;
+  
+  /* Accents */
+  --accent-interactive: #A78BFA;
+  --accent-interactive-hover: #C4B5FD;
+  --accent-success: #10B981;
+  --accent-error: #EF4444;
+  
+  /* Borders */
+  --border-primary: #374151;
+  --border-secondary: #4B5563;
+}
+
 body {
     margin: 0; 
     font-family: sans-serif; 
-    background-color: white; 
+    background-color: var(--bg-canvas); 
+    color: var(--text-primary);
 }
 
+/* ================================================================================================================================================================ */
+/*=========================== EDIT PROJECT PAGE SECTION =========================================================================================================*/
+/* ================================================================================================================================================================ */
+
+
+/* ==================== Board Screen Layout Containers ==================== */
+
 .boards_container {
-    border: 2px solid hsl(126, 50%, 21%);
+    border: 1px solid var(--border-primary);
     position: fixed; 
     bottom: 7%; 
     height: 15.5%;
     left: 0; 
     width: 100%;
-    background-color: #e8fbe8;
+    background-color: var(--bg-surface);
     padding: 5px; 
     display: flex;
     justify-content: left;  
@@ -20,35 +58,38 @@ body {
 }
 
 .animatic_container {
-    border: 2px solid hsl(126, 50%, 21%);
+    border-top: 1px solid var(--border-primary);
     position: fixed; 
     bottom: 0%; 
     height: 7%; 
     width: 100%; 
     display: flex;
     align-items: center;
+    background-color: var(--bg-secondary-surface);
 }
 
-.top_nav_container{
-    border: 2px solid hsl(126, 50%, 21%);
+.top_nav_container {
+    border-bottom: 1px solid var(--border-primary);
     position: fixed; 
     width: 100%;
     top: 0;
     height: 12%; 
-    background-color: #e8fbe8;
+    background-color: var(--bg-surface);
+
     display: flex; 
-    justify-content: center;
     align-items: center;
+    padding: 0 2rem; 
+    gap: 3rem;
 }
 
 .left_nav_container{
-    border: 2px solid hsl(126, 50%, 21%);
+    border-right: 1px solid var(--border-primary);
     position: fixed; 
-    width: 15%;
+    width: 3%;
     top: 12.3%;
     bottom: 24%;
     left: 0;  
-    background-color: #f7f5e8;
+    background-color: var(--bg-secondary-surface);
     display: flex; 
     flex-direction: column; 
     align-items: stretch;
@@ -58,158 +99,311 @@ body {
 }
 
 .right_nav_container{
-    border: 2px solid hsl(126, 50%, 21%);
+    border-left: 1px solid var(--border-primary);
     position: fixed; 
     right: 0;
     width: 15%;
     top: 12.3%;
     bottom: 24%;
-    background-color: #f7f5e8;
+    background-color: var(--bg-secondary-surface);
     display: flex; 
     padding: 8px; 
     overflow-y: auto;
 }
 
 .image_container{
-    border: 2px solid hsl(126, 50%, 21%);
+    border: 1px solid var(--border-primary);
     position: fixed; 
-    background-color : lightgrey; 
-    left: 15.01%; 
-    width: 69.9%; 
+    background-color: var(--bg-surface-light); 
+    left: 4.8%; 
+    width: 78.9%; 
     top: 12.31%; 
     bottom: 23.9%; 
 }
 
-.login_container {
-    border: 2px solid hsl(126, 50%, 21%);
-    position: fixed;
-    width: 30%; 
-    height: 30%;  
-    top: 50%;
-    left: 50%;
-    transform: translate(-50%, -50%);
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    background-color: #e8fbe8;
-}
+/* ==================== Board Info - Internal Right Nav Container CSS ==================== */
 
 .board-info {
   padding: 0px;
+  color: var(--text-primary);
 }
 
 .board-info h2 {
   font-size: 18px;
   font-weight: bold;
   margin-bottom: 8px;
+  color: var(--text-header);
 }
 
 .board-info button {
   margin-top: 12px;
-  padding: 4px 12px;
-  background-color: #188381;
+  padding: 8px 16px;
+  background-color: var(--accent-interactive);
+  color: white;
   border: none;
-  border-radius: 2px;
+  border-radius: 4px;
   cursor: pointer;
+  font-weight: 500;
+  transition: background-color 0.2s;
 }
 
 .board-info button:hover {
-  background-color: #ffffff;
+  background-color: var(--accent-interactive-hover);
 }
 
 .board-placeholder {
   padding: 16px;
-  color: gray;
+  color: var(--text-secondary);
 }
 
-/* This will hold all of the projects */
-.projects_container {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 20px;
-  padding: 20px;
-  justify-content: center;
-}
-
-/* This will hold information for each individual project*/
-.project_card {
-  background-color: #f5f5f5;
-  border-radius: 12px;
-  padding: 20px;
-  width: 250px;
-  box-shadow: 0 4px 6px rgba(0,0,0,0.1);
-  transition: all 0.3s ease;
-  cursor: pointer;
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-}
-
-/* Hover effects */
-.project_card:hover {
-  transform: scale(1.05); /* slightly grow */
-  background-color: #e0e0e0; /* slightly darken */
-  box-shadow: 0 8px 12px rgba(0,0,0,0.2);
-}
-
-/* For the title inside the card*/
-.project_card h3 {
-  font-size: 1.5rem;
-  margin: 0;
-  color: #333;
-}
-
-/* Descripe inside the project card */
-.project_card p {
-  font-size: 1rem;
-  margin: 0;
-  color: #666;
-}
-
-.project_actions {
-  display: flex;
-  gap: 8px; /* space between buttons */
-  margin-top: 8px;
-}
-
-.project_actions button {
-  padding: 4px 8px;
-  font-size: 12px;
-  cursor: pointer;
-}
+/* ==================== Animatic Controls ==================== */
 
 .stop_button {
   width: 70px;
   height: auto;
   cursor: pointer;
+  filter: invert(1) brightness(0.8);
 }
 
 .play_button {
   width: 60px;
   height: auto; 
   cursor: pointer;
-  margin: 5px; 
+  margin: 5px;
+  filter: invert(1) brightness(0.8);
 }
 
-.slider_bar {
-  width: 70%;
-  pointer-events: 'none';
-  margin: 35px; 
+
+
+
+/* ================================================================================================================================================================ */
+/*=========================== PROJECT PAGE SECTION =========================================================================================================*/
+/* ================================================================================================================================================================ */
+
+/* ==================== PROJECTS PAGE HEADER SECTION ==================== */
+
+.projects_page_header {
+  background-color: var(--bg-surface);
+  border-bottom: 1px solid var(--border-primary);
+  padding: 2rem 3rem;
+  margin-bottom: 2rem;
 }
 
-.board_list {
-  top: 10%;
-  max-height: 400px;
-  overflow-y: auto;
-  width: 100%; 
+.header_content {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1rem;
 }
 
-.board_list_item {
-  padding: 8px;
-  border-bottom: 1px solid #ddd;
+.app_title {
+  font-size: 2.5rem;
+  font-weight: 700;
+  color: var(--accent-interactive);
+  margin: 0;
+  letter-spacing: -0.5px;
+}
+
+.header_subtitle {
+  color: var(--text-secondary);
+  font-size: 1.1rem;
+  margin: 0;
+  font-weight: 400;
+}
+
+.header_actions {
+  display: flex;
+  gap: 1rem;
+}
+
+/* ==================== Projects Grid and Body Section ==================== */
+
+.projects_grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  gap: 1.5rem;
+  margin-top: 1rem;
+}
+
+.projects_main_content {
+  padding: 0 3rem;
+}
+
+.projects_section {
+  margin-top: 2rem;
+}
+
+.section_title {
+  font-size: 1.75rem;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin-bottom: 1.5rem;
+  padding-bottom: 0.75rem;
+  border-bottom: 2px solid var(--accent-interactive);
+}
+
+/* ==================== Empty State - If No Projects Exist ==================== */
+.empty_state {
+  text-align: center;
+  padding: 4rem 2rem;
+  background-color: var(--bg-surface);
+  border: 2px dashed var(--border-secondary);
+  border-radius: 12px;
+  margin: 2rem 0;
+}
+
+.empty_state h3 {
+  font-size: 1.5rem;
+  color: var(--text-primary);
+  margin-bottom: 0.5rem;
+}
+
+.empty_state p {
+  color: var(--text-secondary);
+  margin-bottom: 1.5rem;
+}
+
+/*=================== Project Card Styles ==================== */
+
+.project_card {
+  background-color: var(--bg-surface);
+  border: 1px solid var(--border-primary);
+  border-radius: 12px;
+  transition: all 0.3s ease;
   cursor: pointer;
+  height: 200px;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
 }
 
-.board_list_item:hover {
-  background-color: #f0f0f0;
+.project_card:hover {
+  transform: translateY(-6px);
+  border-color: var(--accent-interactive);
+  box-shadow: 0 12px 24px rgba(0, 0, 0, 0.3);
+  background-color: var(--bg-surface-elevated);
+}
+
+.project_card_content {
+  padding: 1.5rem;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+}
+
+.project_card h3 {
+  font-size: 1.5rem;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin: 0 0 0.75rem 0;
+  line-height: 1.3;
+}
+
+.project_card p {
+  font-size: 0.95rem;
+  color: var(--text-secondary);
+  margin: 0 0 1rem 0;
+  line-height: 1.5;
+  flex: 1;
+  overflow: hidden;
+}
+
+.project_card_footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-top: auto;
+}
+
+.project_date {
+  font-size: 0.85rem;
+  color: var(--text-disabled);
+}
+
+.project_actions {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.project_actions button {
+  padding: 0.5rem 1rem;
+  font-size: 0.85rem;
+  font-weight: 500;
+  border-radius: 6px;
+  border: none;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.project_actions .edit_button {
+  background-color: var(--bg-surface-elevated);
+  color: var(--text-primary);
+  border: 1px solid var(--border-secondary);
+}
+
+.project_actions .edit_button:hover {
+  background-color: var(--accent-interactive);
+  color: white;
+  border-color: var(--accent-interactive);
+}
+
+.project_actions .delete_button {
+  background-color: transparent;
+  color: var(--accent-error);
+  border: 1px solid var(--accent-error);
+}
+
+.project_actions .delete_button:hover {
+  background-color: var(--accent-error);
+  color: white;
+}
+/* ================================================================================================================================================================ */
+/*======================= LOGIN PAGE CSS ====================================================================================================================================*/
+/* ================================================================================================================================================================ */
+
+
+.login_container {
+    border: 1px solid var(--border-primary);
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: 400px;
+    height: 400px;
+    padding: 2rem;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    background-color: var(--bg-surface);
+    border-radius: 8px;
+    box-shadow: 0 10px 25px rgba(0, 0, 0, 0.5);
+}
+
+
+.login_content {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+}
+
+.login_header {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.25rem; 
+}
+
+.app_title {
+    font-size: 2.5rem;
+    margin: 0;
+}
+
+.app_tagline {
+    margin: 1rem;
+    font-size: 1.1rem;
+}
+.login_button_margin {
+    margin-top: 3rem; 
 }

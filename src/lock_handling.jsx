@@ -1,14 +1,17 @@
 import { supabase } from './supabase-client'
 import { getClientID } from './client_id.jsx'
 
-//This function tries to acquire the lock to edit a board (if lock cannot be acquired then you cannot currently edit this board)
+/*========================================================================*/
+/*============ BOARD LEVEL LOCKS =========================================*/
+/*========================================================================*/
+
+//Aquire Edit Board Lock Function - (If not aquired you cannot edit the board)
 export async function acquireLock(boardId) {
-    //Calls a PostgreSQL function that checks if the lock can be acquired
     const clientID = getClientID(); 
     const { data, error } = await supabase.rpc('acquire_board_lock', {
         board_id: boardId, 
         client_id: clientID,
-        ttl_seconds: 200
+        ttl_seconds: 300
     });
 
     if (error) {
@@ -19,10 +22,7 @@ export async function acquireLock(boardId) {
     return data; 
 }
 
-
-//This function will release the lock 
-//This function will be called if someone leaves the edit_board modal
-//so others can acquire the lock
+//Release Edit Board Lock Function - (Frees up the board for others to edit)
 export async function releaseLock(boardId) {
   const clientId = getClientID();
   const { error } = await supabase.rpc('release_board_lock', {
@@ -38,6 +38,7 @@ export async function releaseLock(boardId) {
   return true; 
 }
 
+//Safely deletes a board by checking to make sure no one has the edit lock
 export async function safeDeleteBoard(boardId) {
     const clientID = getClientID();
     const { error } = await supabase.rpc('safe_delete_board', {
@@ -52,8 +53,50 @@ export async function safeDeleteBoard(boardId) {
     return true; 
 }
 
-//Lock you get when entering a project - it is not exclusive
-//Everyone who enters a project gets a lock for that project
+// Aquire Drag Lock - Advisory Lock for drag operations (only one person can drag at a time)
+export const acquireDragLock = async (projectId) => {
+  try {
+    console.log("Attempting to acquire drag lock for project:", projectId);
+    const { data, error } = await supabase.rpc("acquire_project_drag_lock", { 
+      p_project_id: Number(projectId) 
+    });
+    
+    if (error) {
+      console.error("Error acquiring drag lock:", error);
+      return false;
+    }
+    console.log("Drag lock acquired:", data);
+    return data === true;
+  } catch (err) {
+    console.error("Exception acquiring drag lock:", err);
+    return false;
+  }
+};
+
+// Release Drag Lock - Releases after drag operation is complete
+export const releaseDragLock = async (projectId) => {
+  try {
+    console.log("Releasing drag lock for project:", projectId);
+    // Advisory locks auto-release at transaction end, but call RPC for consistency
+    const { error } = await supabase.rpc("release_project_drag_lock", { 
+      p_project_id: Number(projectId) 
+    });
+    
+    if (error) {
+      console.error("Error in release drag lock:", error);
+    }
+  } catch (err) {
+    console.error("Exception in release drag lock:", err);
+  }
+};
+
+
+/*========================================================================*/
+/*============ INTERNAL PROJECT LEVEL LOCKS (entering the project) =======*/
+/*========================================================================*/
+
+//Aquire Project Session Lock - it is not exclusive
+//Everyone who enters a project gets a lock for that project - prevents deletion while in use
 export async function acquireProjectSessionLock(projectId) {
   const clientId = getClientID();
   const { data, error } = await supabase.rpc('acquire_project_session_lock', {
@@ -70,8 +113,7 @@ export async function acquireProjectSessionLock(projectId) {
   return data;
 }
 
-//Anytime you make an edit while inside of a project the expiration time 
-//will reset (testing for inactivity)
+//Reset the TTL on the project session lock if you edit within the project (For inactivity timeout)
 export async function refreshProjectSessionLock(projectId) {
   const clientId = getClientID();
   const { data, error } = await supabase.rpc('refresh_project_session_lock', {
@@ -88,7 +130,7 @@ export async function refreshProjectSessionLock(projectId) {
   return data;
 }
 
-//Release the lock whenever you leave the project
+//Release Project Session Lock - when you leave the project page
 export async function releaseProjectSessionLock(projectId) {
   const clientId = getClientID();
   const { error } = await supabase.rpc('release_project_session_lock', {
@@ -103,8 +145,12 @@ export async function releaseProjectSessionLock(projectId) {
   return true;
 }
 
-// Project Edit Lock
-// This lock is exclusive and is for if you are editing the description or title of a project
+
+/*========================================================================*/
+/*============ EXTERNAL PROJECT LEVEL LOCKS (project page) ===============*/
+/*========================================================================*/
+
+// Aquire Project Edit Lock - Exclusive and is for if you are editing the project details (name and description)
 export async function acquireProjectEditLock(projectId) {
   const clientId = getClientID();
   const { data, error } = await supabase.rpc('acquire_project_edit_lock', {
@@ -120,7 +166,7 @@ export async function acquireProjectEditLock(projectId) {
   return data;
 }
 
-//Release lock after you leave the modal for editing a project (name and description)
+//Release Project Edit Lock - Release lock after you leave the modal for editing a project (name and description)
 export async function releaseProjectEditLock(projectId) {
   const clientId = getClientID();
   const { error } = await supabase.rpc('release_project_edit_lock', {
@@ -135,8 +181,7 @@ export async function releaseProjectEditLock(projectId) {
   return true;
 }
 
-//Safely deletes a project by checking to make sure no one has either the 
-//project session lock or project edit lock 
+//Safely deletes a project - checks to ensure no one has session lock or project edit lock
 export async function safeDeleteProject(projectId) {
   const { error } = await supabase.rpc('safe_delete_project', {
     target_project_id: projectId

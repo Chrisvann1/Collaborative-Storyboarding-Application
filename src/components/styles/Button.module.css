@@ -1,0 +1,68 @@
+/*==================== Button Styles ==================== */
+/**
+ * Main Button
+ *
+ * - Flexbox centering for content alignment
+ * - Primary interactive background color
+ * - Subtle hover animation and transition
+ * - Rounded corners and medium font weight for accessibility
+ */
+.button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 12px 24px;
+  font-size: 14px;
+  background-color: var(--accent-interactive);
+  color: white;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  font-weight: 500;
+  transition: all 0.2s;
+}
+
+/**
+ * Delete Button Variant
+ * 
+ * Uses error accent color for destructive actions
+ * Higher specificity to override base button styles
+ * Also, made the padding smaller because the button was too large
+ */
+.button.delete {
+  background-color: var(--accent-error);
+  padding: 12px 10px;
+}
+
+.button.delete:hover {
+  background-color: #dc2626;
+  transform: translateY(-1px);
+}
+
+/**
+ * Button Hover State
+ * slight upward motion and color change on hover.
+ * Excludes delete buttons to preserve their distinct styling
+ */
+.button:hover:not(.delete) {
+  background-color: var(--accent-interactive-hover);
+  transform: translateY(-1px);
+}
+
+/**
+ * Project Button Variant for Create Project button
+ *
+ * Differences from base button:
+ * - Smaller padding
+ * - Increased font weight
+ * - Larger border radius
+ * - Elevated shadow for emphasis
+ */
+.button.addProject {
+  padding: 8px 16px;
+  font-size: 14px;
+  font-weight: 600;
+  border-radius: 8px;
+  box-shadow: 0 4px 12px rgba(167, 139, 250, 0.3);
+  transition: all 0.3s ease;
+}
