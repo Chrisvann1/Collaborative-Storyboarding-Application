@@ -11,7 +11,7 @@ export async function acquireLock(boardId) {
     const { data, error } = await supabase.rpc('acquire_board_lock', {
         board_id: boardId, 
         client_id: clientID,
-        ttl_seconds: 300
+        ttl_seconds: 90
     });
 
     if (error) {
@@ -102,7 +102,7 @@ export async function acquireProjectSessionLock(projectId) {
   const { data, error } = await supabase.rpc('acquire_project_session_lock', {
     project_id: projectId,
     client_id: clientId,
-    ttl_seconds: 300
+    ttl_seconds: 90
   });
   
   if (error) {
@@ -119,7 +119,7 @@ export async function refreshProjectSessionLock(projectId) {
   const { data, error } = await supabase.rpc('refresh_project_session_lock', {
     project_id: projectId,
     client_id: clientId,
-    ttl_seconds: 300
+    ttl_seconds: 90
   });
   
   if (error) {
@@ -156,7 +156,7 @@ export async function acquireProjectEditLock(projectId) {
   const { data, error } = await supabase.rpc('acquire_project_edit_lock', {
     project_id: projectId,
     client_id: clientId,
-    ttl_seconds: 300
+    ttl_seconds: 90
   });
   
   if (error) {
