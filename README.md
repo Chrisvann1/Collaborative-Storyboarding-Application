@@ -232,7 +232,7 @@ Files of interest:
 ![Edit Board](README_images/Edit_Board.png)
 
 #### Animatic Bar 
-- Note - As the animatic iterates through the boards, the large central area for the currently selected board's image will change accordingly
+- Note - As the animatic feature iterates through the boards, the large central area for the currently selected board's image will change accordingly
   
 ![Animatic Feature](README_images/Animatic.png)
 
