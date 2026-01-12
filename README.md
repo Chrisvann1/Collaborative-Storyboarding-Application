@@ -50,9 +50,8 @@
 
 Prerequisites:
 
-- Node.js v16+ and npm
+- Node.js v16+
 	- Node.js - Download from: [Node.js](http://nodejs.org)
-	- npm (comes with Node.js)
 
 - A Supabase project (for the database and storage)
 	- Sign up at [Supabase](https://supabase.com])(free tier available)
