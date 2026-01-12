@@ -85,8 +85,10 @@ VITE_SUPABASE_KEY=your-anon-or-service-key
 3. Navigate to SQL editor in Supabase web application and copy and paste the ***supabase_complete_schema.sql*** file content into this SQL editor and click the green run button. 
 	- Creates the projects cloud-based database, PostgreSQL functions, and triggers
 
-4. Navigate to the ***Storage*** section of the Supabase web application, then going to the ***files*** subsection, and creating a storage bucket with the name ***images***. This storage bucket should also have four policies associated with it as seen below: 
+4. Navigate to the ***Storage*** section of the Supabase web application, then going to the ***files*** subsection, and creating a storage bucket with the name ***images***. This storage bucket should also have four policies associated with it as seen below:
+
    ![Policies](README_images/policies.png)
+
 - These policies can be created through the ***Policies*** tab of the ***Files*** subsection. 
 
 
@@ -202,7 +204,9 @@ Files of interest:
 ![Project_w_Boards](README_images/Projects_w_P.png)
 
 #### Project Page W/ No Projects
+
 ![Project_Empty](README_images/Project_Empty.png)
+
 #### Create/Edit Project Modal 
 - Note - Edit board has a different header
 
@@ -221,10 +225,13 @@ Files of interest:
 - Notes:
 	- Add board has a different header
 	- This is scrollable - the rest of this modal cannot be seen in this image
+
+ 
 ![Edit Board](README_images/Edit_Board.png)
 
 #### Animatic Bar 
 - Note - As the animatic iterates through the boards, the large central area for the currently selected board's image will change accordingly
+  
 ![Animatic Feature](README_images/Animatic.png)
 
 #### Delete Board Modal
