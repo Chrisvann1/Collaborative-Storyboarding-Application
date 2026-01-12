@@ -210,7 +210,7 @@ Files of interest:
 
 #### Delete Modal 
 
-![[Screenshot 2026-01-12 at 12.00.08 PM.png]]
+![Delete Modal](README_images/Delete_modal.png)
 ### Edit Project Page Essential UI Elements 
 - This is where the actual storyboarding is done
 
