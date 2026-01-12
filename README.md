@@ -70,6 +70,8 @@ npm install
 ```
 
 2. Create a `.env` file in the project root with your Supabase credentials
+- SUPABASE_URL - Found in Data API section of project settings
+- SUPABASE_KEY - Found in API Keys section of project settings
 
 ```
 
@@ -82,16 +84,13 @@ VITE_SUPABASE_KEY=your-anon-or-service-key
 - Do NOT commit .env file to source control 
 
 3. Navigate to SQL editor in Supabase web application and copy and paste the ***supabase_complete_schema.sql*** file content into this SQL editor and click the green run button. 
-	- Creates the projects cloud-based database, PostgreSQL functions, and triggers
-
-4. Navigate to the ***Storage*** section of the Supabase web application, then going to the ***files*** subsection, and creating a storage bucket with the name ***images***. This storage bucket should also have four policies associated with it as seen below:
+	- Creates the projects cloud-based database, PostgreSQL functions, triggers, "images" storage bucket, and storage bucket policies
+	- Image storage bucket policies should appear as below (can be found by navigating to ***Storage***, then ***Files***, and then ***Policies***):
 
    ![Policies](README_images/policies.png)
 
-- These policies can be created through the ***Policies*** tab of the ***Files*** subsection. 
 
-
-5. Run the dev server
+4. Run the dev server
 
 ```bash
 
@@ -99,7 +98,7 @@ npm run dev
 
 ```
 
-6. Open http://localhost:5173 in your browser (Vite will show the exact URL in the console).
+5. Open http://localhost:5173 in your browser (Vite will show the exact URL in the console).
 
 ---
 
