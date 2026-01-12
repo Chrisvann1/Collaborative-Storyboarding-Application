@@ -215,10 +215,12 @@ Files of interest:
 #### Delete Modal 
 
 ![Delete Modal](README_images/Delete_modal.png)
+
 ### Edit Project Page Essential UI Elements 
 - This is where the actual storyboarding is done
 
-#### Main Page 
+#### Specific Project Page (when you actually navigate to a specific project)
+
 ![Edit Project](README_images/Edit_Project.png)
 
 #### Edit/Add Board Modal 
