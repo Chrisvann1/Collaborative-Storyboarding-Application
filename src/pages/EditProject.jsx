@@ -893,6 +893,11 @@ return (
       )}
     </div>
 
+    {/* ========================= Left Side========================= */}
+    {/* Just creates a space on the left side of the screen that matches the color scheme*/}
+    <div className="left_side">
+    </div>
+
     {/* ========================= Modals ========================= */}
     <div>
       {/* Add Board Modal */}

@@ -40,6 +40,22 @@ body {
 /* ================================================================================================================================================================ */
 
 
+.left_side{
+    border-right: 1px solid var(--border-primary);
+    position: fixed; 
+    width: 3%;
+    top: 12.3%;
+    bottom: 24%;
+    left: 0;  
+    background-color: var(--bg-secondary-surface);
+    display: flex; 
+    flex-direction: column; 
+    align-items: stretch;
+    justify-content: flex-start;
+    gap: 12px;  
+    padding: 12px;   
+}
+
 /* ==================== Board Screen Layout Containers ==================== */
 
 .boards_container {
