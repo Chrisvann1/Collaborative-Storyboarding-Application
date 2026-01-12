@@ -86,7 +86,7 @@ VITE_SUPABASE_KEY=your-anon-or-service-key
 	- Creates the projects cloud-based database, PostgreSQL functions, and triggers
 
 4. Navigate to the ***Storage*** section of the Supabase web application, then going to the ***files*** subsection, and creating a storage bucket with the name ***images***. This storage bucket should also have four policies associated with it as seen below: 
-   ![[Screenshot 2026-01-12 at 11.30.59 AM.png]]
+   ![Policies](README_images/policies.png)
 - These policies can be created through the ***Policies*** tab of the ***Files*** subsection. 
 
 
@@ -192,22 +192,21 @@ Files of interest:
 
 ## Application User Interface Overview
 
-### Main Login Page
+### Website Entry Page
 
-![[Opening.png]]
+![Website Entry Page](README_images/Opening.png)
 
 ### Project Page Essential UI Elements
 #### Project Page W/ Projects Present 
 
-![[Projects_w_P.png]]
+![Project_w_Boards](README_images/Projects_w_P.png)
 
 #### Project Page W/ No Projects
-![[Project Empty.png]]
-
+![Project_Empty](README_images/Project_Empty.png)
 #### Create/Edit Project Modal 
 - Note - Edit board has a different header
 
-![[Create_Project.png]]
+![Create Project](README_images/Create_Project.png)
 
 #### Delete Modal 
 
@@ -215,17 +214,18 @@ Files of interest:
 ### Edit Project Page Essential UI Elements 
 - This is where the actual storyboarding is done
 
-#### Main Page ![[Edit_Project.png]]
+#### Main Page 
+![Edit Project](README_images/Edit_Project.png)
 
 #### Edit/Add Board Modal 
 - Notes:
 	- Add board has a different header
 	- This is scrollable - the rest of this modal cannot be seen in this image
-![[Edit_Board.png]]
+![Edit Board](README_images/Edit_Board.png)
 
 #### Animatic Bar 
 - Note - As the animatic iterates through the boards, the large central area for the currently selected board's image will change accordingly
-![[Animatic.png]]
+![Animatic Feature](README_images/Animatic.png)
 
 #### Delete Board Modal
 - Same UI as delete project modal seen above
