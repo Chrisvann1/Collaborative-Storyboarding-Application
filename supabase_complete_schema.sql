@@ -1,4 +1,28 @@
 
+-- Create the images bucket if it doesn't exist
+INSERT INTO storage.buckets (id, name, public)
+VALUES ('images', 'images', true)
+ON CONFLICT (id) DO UPDATE SET public = true;
+
+-- Policy 1: Allow any user to view images
+CREATE POLICY "Allow viewing for any user"
+ON storage.objects FOR SELECT TO public
+USING (bucket_id = 'images');
+
+-- Policy 2: Allow any user to upload images
+CREATE POLICY "Allow uploads for any user"
+ON storage.objects FOR INSERT TO public
+WITH CHECK (bucket_id = 'images');
+
+-- Policy 3: Allow any user to update images
+CREATE POLICY "Allow updates for any user"
+ON storage.objects FOR UPDATE TO public
+USING (bucket_id = 'images');
+
+-- Policy 4: Allow any user to delete images
+CREATE POLICY "Allow deletes for any user"
+ON storage.objects FOR DELETE TO public
+USING (bucket_id = 'images');
 
 
 SET statement_timeout = 0;
