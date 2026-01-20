@@ -54,16 +54,18 @@ Prerequisites:
 	- Node.js - Download from: [Node.js](http://nodejs.org)
 
 - A Supabase project (for the database and storage)
-	- Sign up at [Supabase](https://supabase.com)(free tier available)
+	- Sign up at [Supabase](https://supabase.com)(free tier available) - Click on "Start your project" option
 	- You will need your Supabase project URL and API key for configuration (more information found in ***Environment and Supabase section***)
 
 Steps:
 
-1. Clone the repository and install dependencies
+1. Clone the repository and install dependencies using command line
 
 ```bash
 
 git clone https://github.com/Chrisvann1/Collaborative-Storyboarding-Application.git
+
+cd Collaborative-Storyboarding-Application/
 
 npm install
 

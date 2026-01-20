@@ -1,6 +1,7 @@
 import  placeholder_image from "../assets/placeholder.jpeg";
 import { useState} from "react";
 import { useEffect } from 'react';
+import { useRef } from 'react';
 import { DndContext, closestCenter } from "@dnd-kit/core";
 import { SortableContext, useSortable, arrayMove } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
@@ -16,12 +17,13 @@ import { StopButton } from "../assets/StopButton.jsx";
 import { useNavigate } from "react-router-dom";
 import { acquireLock } from "../lock_handling.jsx";
 import { releaseLock } from "../lock_handling.jsx";
-import { acquireDragLock, releaseDragLock } from "../lock_handling.jsx";
+//import { acquireDragLock, releaseDragLock } from "../lock_handling.jsx";
 import { safeDeleteBoard } from "../lock_handling.jsx";
 import  DeleteBoardModal  from "../components/DeleteBoardModal.jsx";
 import { refreshProjectSessionLock, 
          releaseProjectSessionLock } from "../lock_handling.jsx";
 import { getClientID } from "../client_id.jsx";
+
 
 
 
@@ -97,7 +99,8 @@ export default function EditProject() {
 const { id } = useParams();
 // Hook to navigate between pages/routes
 const navigate = useNavigate();
-
+// Tracks if the user is performing a drag-and-drop update to ignore "echo" events
+const isUpdating = useRef(false);
 
   /*==========Stateful Variables=============================*/
 
@@ -277,18 +280,17 @@ const fetchProjectTitle = async () => {
  * - active: The board object that is currently being dragged. Contains the board's ID.
  * - over: The board object that is currently under the dragged board when it is released. Contains the board's ID.
  */
+
 async function onDragEnd({ active, over }) {
   // --------------------------------------------------
   // Step 1: Ignore invalid drops
   // --------------------------------------------------
-  // If there is no board under the dragged item (over is null)
-  // or the dragged board was dropped in the same position, do nothing.
   if (!over || active.id === over.id) {
     return;
   }
 
   // --------------------------------------------------
-  // Step 2: Find the old and new positions of the dragged board
+  // Step 2: Find old and new positions
   // --------------------------------------------------
   const oldIndex = boards.findIndex(b => b.id === active.id);
   const newIndex = boards.findIndex(b => b.id === over.id);
@@ -300,71 +302,40 @@ async function onDragEnd({ active, over }) {
   // --------------------------------------------------
   // Step 3: Optimistically update frontend order
   // --------------------------------------------------
-  // Move the dragged board to its new position in the local state immediately.
-  // This makes the drag feel responsive to the user.
   const reordered = arrayMove(boards, oldIndex, newIndex);
   setBoards(reordered);
 
   // --------------------------------------------------
-  // Step 4: Acquire drag lock before persisting changes
+  // Step 4: Persist new order and manage "Bounce" Guard
   // --------------------------------------------------
-  // Ensure that only one user can reorder boards at a time.
   try {
-    const gotLock = await acquireDragLock(id);
+    // Set the guard to true so the Realtime listener ignores incoming row updates
+    isUpdating.current = true;
 
-    // If lock is not acquired, revert frontend order to match database
-    if (!gotLock) {
-      alert("Another user is currently reordering boards. Reverting order.");
-      // Fetch the current order from database to revert frontend
-      const { data: currentBoards, error } = await supabase
-        .from("boards")
-        .select("*")
-        .eq("project_id", id)
-        .order("shot", { ascending: true });
+    const updates = reordered.map((b, i) => ({ 
+      ...b, 
+      shot: i + 1 
+    }));
 
-      if (!error && currentBoards) {
-        setBoards(currentBoards);
-      } else {
-        console.error("Failed to fetch boards to revert order:", error?.message);
-      }
-      return;
-    }
+    const { error } = await supabase
+      .from("boards")
+      .upsert(updates);
 
-    // --------------------------------------------------
-    // Step 5: Persist new board order in the database
-    // --------------------------------------------------
-    for (let i = 0; i < reordered.length; i++) {
-      const { error } = await supabase
-        .from("boards")
-        .update({ shot: i + 1 }) 
-        .eq("id", reordered[i].id);
-
-      if (error) {
-        console.error("Error updating shot:", error.message);
-      }
+    if (error) {
+      console.error("Error updating board shots:", error.message);
     }
 
   } catch (err) {
-    // If any error occurs, try to revert frontend order
     console.error("Drag reorder failed:", err);
-    const { data: currentBoards, error } = await supabase
-      .from("boards")
-      .select("*")
-      .eq("project_id", id)
-      .order("shot", { ascending: true });
-
-    if (!error && currentBoards) {
-      setBoards(currentBoards);
-    }
+    // If it fails, refresh to restore database state
+    fetchBoards();
   } finally {
-    // --------------------------------------------------
-    // Step 6: Release the drag lock
-    // --------------------------------------------------
-    try {
-      await releaseDragLock(id);
-    } catch (e) {
-      console.error("Error releasing drag lock:", e);
-    }
+    // Wait a short duration (500ms) for all row-update messages to fire
+    // then release the guard and perform a final sync to catch collaborator edits.
+    setTimeout(async () => {
+      isUpdating.current = false;
+      await fetchBoards();
+    }, 500);
   }
 }
 
@@ -624,7 +595,7 @@ useEffect(() => {
   );
 
   // Listen for updates to existing boards in this project
-  channel.on(
+channel.on(
     'postgres_changes',
     {
       event: 'UPDATE',             
@@ -633,6 +604,13 @@ useEffect(() => {
       filter: `project_id=eq.${id}` 
     },
     (payload) => {
+      // --- LOGIC TO PREVENT BOUNCE ---
+      // If we are currently reordering boards ourselves, ignore the row-by-row 
+      // updates from Supabase to prevent the UI from flickering/bouncing.
+      if (isUpdating.current) {
+        return; 
+      }
+
       console.log('Board UPDATE:', payload);
 
       // Refresh all boards in the frontend

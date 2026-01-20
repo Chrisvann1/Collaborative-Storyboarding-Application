@@ -53,6 +53,7 @@ export async function safeDeleteBoard(boardId) {
     return true; 
 }
 
+/*
 // Aquire Drag Lock - Advisory Lock for drag operations (only one person can drag at a time)
 export const acquireDragLock = async (projectId) => {
   try {
@@ -90,6 +91,7 @@ export const releaseDragLock = async (projectId) => {
   }
 };
 
+*/
 
 /*========================================================================*/
 /*============ INTERNAL PROJECT LEVEL LOCKS (entering the project) =======*/

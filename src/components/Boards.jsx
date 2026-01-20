@@ -33,7 +33,7 @@ function Board(props){
                     <div className={styles.image_placeholder}></div>
                 )}
             </div>
-            <p className={styles.board_title}>Shot: {props.title}</p>
+            <p className={styles.board_title}>Title: {props.title}</p>
         </div>
     );
 }
