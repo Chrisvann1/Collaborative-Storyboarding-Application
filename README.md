@@ -137,7 +137,7 @@ VITE_SUPABASE_KEY=provided-by-your-team
 ```
 npm run dev
 ```
-### 4. Opern the application
+### 4. Open the application
 - Navigate to the following URL 
 ``` 
 http://localhost:5173
