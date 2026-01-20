@@ -54,7 +54,7 @@ Prerequisites:
 	- Node.js - Download from: [Node.js](http://nodejs.org)
 
 - A Supabase project (for the database and storage)
-	- Sign up at [Supabase](https://supabase.com])(free tier available)
+	- Sign up at [Supabase](https://supabase.com)(free tier available)
 	- You will need your Supabase project URL and API key for configuration (more information found in ***Environment and Supabase section***)
 
 Steps:
