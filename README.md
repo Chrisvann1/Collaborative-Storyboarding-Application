@@ -46,7 +46,9 @@
 --- 
   
 
-## Running The Project
+## Running The Project From Scratch (First-Time Supabase Setup)
+
+**Use this section if you are the first person on your team setting up Supabase**. If your team already has the project configured with supabase, skip to the next section.
 
 Prerequisites:
 
@@ -103,6 +105,43 @@ npm run dev
 5. Open http://localhost:5173 in your browser (Vite will show the exact URL in the console).
 
 ---
+
+## Running the Project Using an Existing Supabase Setup (Team Members)
+
+Use this section if another team member has already created and configured Supabase for this project. You do not need your own Supabase account or project.
+
+### What You Need From Your Team
+
+Ask a teammate for the following information:
+- VITE_SUPABASE_URL
+- VITE_SUPABASE_KEY (anon public key)
+
+### 1. Clone the repository and install dependencies 
+```
+git clone https://github.com/Chrisvann1/Collaborative-Storyboarding-Application.git
+
+cd Collaborative-Storyboarding-Application/
+
+npm install
+```
+
+### 2. Create a .env file using your team's Supabase credentials 
+In the project root, create a .env file: 
+``` 
+VITE_SUPABASE_URL=provided-by-your-team
+VITE_SUPABASE_KEY=provided-by-your-team
+```
+- These should match the existing team supabase project 
+
+### 3. Start the development server 
+```
+npm run dev
+```
+### 4. Opern the application
+- Navigate to the following URL 
+``` 
+http://localhost:5173
+```
 
 ## Project structure (high level)
 
